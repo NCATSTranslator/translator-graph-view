@@ -7,7 +7,7 @@ Renders [Biolink Model](https://biolink.github.io/biolink-model/) knowledge grap
 ## Features
 
 - Interactive graph visualization with pan, zoom, and selection
-- Four automatic layout algorithms: hierarchical, force-directed, radial, and grid
+- Four automatic layout algorithms: hierarchical, force-directed, and grid
 - Nodes color-coded by Biolink type
 - Controlled and uncontrolled selection modes
 - MiniMap and zoom controls
@@ -73,7 +73,6 @@ The `GraphView` container must have a defined width and height.
 - `'hierarchical'` - Layered top-to-bottom (default)
 - `'hierarchicalLR'` - Layered left-to-right
 - `'force'` - Force-directed
-- `'radial'` - Circular radial
 - `'grid'` - Box/grid
 
 ### Data format
