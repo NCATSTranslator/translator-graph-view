@@ -169,6 +169,7 @@ function GraphViewInner({
       fitView
       fitViewOptions={{ padding: 0.1 }}
       className={`${styles.graphView} ${className || ''}`}
+      proOptions={{hideAttribution: true }}
     >
       <Background color="#ddd" gap={20} />
       <Controls />
