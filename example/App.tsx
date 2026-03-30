@@ -140,6 +140,7 @@ function App() {
         <GraphView
           data={data}
           layout={layout}
+          elkWorkerUrl={new URL('elkjs/lib/elk-worker.min.js', import.meta.url).href}
           onSelectionChange={handleSelectionChange}
           onNodeClick={handleNodeClick}
           onEdgeClick={handleEdgeClick}

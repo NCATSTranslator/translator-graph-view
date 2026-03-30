@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import ELK from 'elkjs/lib/elk.bundled.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import ELK from 'elkjs/lib/elk-api.js';
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs';
 import type { FlowNode, FlowEdge, LayoutType } from '../types';
 import { getLayoutOptions } from '../layouts';
 import { NODE_WIDTH, NODE_HEIGHT } from '../utils';
 
-const elk = new ELK();
-
 interface UseGraphLayoutOptions {
   nodes: FlowNode[];
   edges: FlowEdge[];
   layout: LayoutType;
+  elkWorkerUrl: string;
 }
 
 interface UseGraphLayoutResult {
@@ -34,7 +33,10 @@ export function useGraphLayout({
   nodes,
   edges,
   layout,
+  elkWorkerUrl,
 }: UseGraphLayoutOptions): UseGraphLayoutResult {
+  const elk = useMemo(() => new ELK({ workerUrl: elkWorkerUrl }), [elkWorkerUrl]);
+
   const [layoutedNodes, setLayoutedNodes] = useState<FlowNode[]>(nodes);
   const [layoutedEdges, setLayoutedEdges] = useState<FlowEdge[]>(edges);
   const [isLayouting, setIsLayouting] = useState(false);
@@ -98,7 +100,7 @@ export function useGraphLayout({
     } finally {
       setIsLayouting(false);
     }
-  }, [nodes, edges, layout]);
+  }, [nodes, edges, layout, elk]);
 
   useEffect(() => {
     applyLayout();

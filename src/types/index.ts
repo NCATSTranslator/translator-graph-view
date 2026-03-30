@@ -101,6 +101,7 @@ export type FlowEdge = Edge<GraphEdgeData>;
 export interface GraphViewProps {
   data: GraphData;
   layout?: LayoutType;
+  elkWorkerUrl: string;
   onSelectionChange?: (selection: Selection) => void;
   onNodeClick?: (node: GraphNode) => void;
   onEdgeClick?: (edge: GraphEdge) => void;
