@@ -17,10 +17,10 @@ Renders [Biolink Model](https://biolink.github.io/biolink-model/) knowledge grap
 ## Installation
 
 ```bash
-npm install translator-graph-view
+npm install translator-graph-view elkjs
 ```
 
-React 18+ is required as a peer dependency.
+React 18+ and `elkjs` 0.9+ are required as peer dependencies.
 
 ## Usage
 
@@ -38,12 +38,15 @@ const data = {
   },
 };
 
+const elkWorkerUrl = new URL('elkjs/lib/elk-worker.min.js', import.meta.url).href;
+
 function App() {
   return (
     <div style={{ width: '100%', height: '600px' }}>
       <GraphView
         data={data}
         layout="hierarchical"
+        elkWorkerUrl={elkWorkerUrl}
         onNodeClick={(node) => console.log('Clicked:', node)}
         onSelectionChange={(selection) => console.log('Selected:', selection)}
       />
@@ -61,12 +64,23 @@ The `GraphView` container must have a defined width and height.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `data` | `GraphData` | required | Graph nodes and edges |
+| `elkWorkerUrl` | `string` | required | URL to the ELKjs web worker script (see below) |
 | `layout` | `LayoutType` | `'hierarchical'` | Layout algorithm |
 | `onSelectionChange` | `(selection: Selection) => void` | - | Fires when selection changes |
 | `onNodeClick` | `(node: GraphNode) => void` | - | Fires when a node is clicked |
 | `onEdgeClick` | `(edge: GraphEdge) => void` | - | Fires when an edge is clicked |
 | `selectedIds` | `string[]` | - | Controlled selection by node/edge ID |
 | `className` | `string` | - | Additional CSS class for the container |
+
+#### `elkWorkerUrl`
+
+Layout computation is offloaded to a web worker, keeping the ~1.5 MB ELK engine out of your main bundle. You must provide a URL pointing to the ELK worker script. In Vite-based apps:
+
+```ts
+const elkWorkerUrl = new URL('elkjs/lib/elk-worker.min.js', import.meta.url).href;
+```
+
+For webpack or other bundlers, serve `node_modules/elkjs/lib/elk-worker.min.js` as a static asset and pass its URL.
 
 ### Layout types
 
@@ -100,7 +114,7 @@ interface GraphEdge {
 
 ### Hooks
 
-- **`useGraphLayout({ nodes, edges, layout })`** - Computes ELK layout positions for ReactFlow nodes/edges
+- **`useGraphLayout({ nodes, edges, layout, elkWorkerUrl })`** - Computes ELK layout positions for ReactFlow nodes/edges via a web worker
 - **`useSelection({ data, onSelectionChange })`** - Manages node/edge selection state
 
 ### Utilities

@@ -52,6 +52,7 @@ interface GraphViewInnerProps extends GraphViewProps {
 function GraphViewInner({
   data,
   layout = 'hierarchical',
+  elkWorkerUrl,
   onSelectionChange,
   onNodeClick,
   onEdgeClick,
@@ -66,6 +67,7 @@ function GraphViewInner({
     nodes: initialNodes,
     edges: initialEdges,
     layout,
+    elkWorkerUrl,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
