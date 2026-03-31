@@ -186,10 +186,13 @@ function GraphViewInner({
 }
 
 export function GraphView(props: GraphViewProps) {
-  const { data } = props;
+  const { data, edgeType, showEdgeLabels = true } = props;
 
   const initialNodes = useMemo(() => transformNodesToFlow(data), [data]);
-  const initialEdges = useMemo(() => transformEdgesToFlow(data), [data]);
+  const initialEdges = useMemo(
+    () => transformEdgesToFlow(data, edgeType, showEdgeLabels),
+    [data, edgeType, showEdgeLabels],
+  );
 
   return (
     <ReactFlowProvider>

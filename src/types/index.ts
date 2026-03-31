@@ -72,6 +72,9 @@ export interface Provenance {
 // Layout types
 export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid';
 
+// Edge path types
+export type EdgeType = 'bezier' | 'straight' | 'step' | 'smoothstep';
+
 // Selection types
 export interface Selection {
   nodes: GraphNode[];
@@ -90,6 +93,8 @@ export interface GraphNodeData extends Record<string, unknown> {
 export interface GraphEdgeData extends Record<string, unknown> {
   label: string;
   graphEdge: GraphEdge;
+  edgeType?: EdgeType;
+  showLabel?: boolean;
   selected?: boolean;
 }
 
@@ -101,6 +106,8 @@ export type FlowEdge = Edge<GraphEdgeData>;
 export interface GraphViewProps {
   data: GraphData;
   layout?: LayoutType;
+  edgeType?: EdgeType;
+  showEdgeLabels?: boolean;
   elkWorkerUrl: string;
   onSelectionChange?: (selection: Selection) => void;
   onNodeClick?: (node: GraphNode) => void;

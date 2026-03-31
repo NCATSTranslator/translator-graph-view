@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { GraphNodeData } from '../../types';
+import { capitalizeAllWords, getNodeTypeIcon } from '../../utils/utils';
 import styles from './GraphNode.module.scss';
 
 function GraphNodeComponent({ data, selected }: NodeProps) {
@@ -9,6 +10,11 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
     '--node-color': nodeData.color,
   } as React.CSSProperties;
 
+  const nodeTypeIcon = getNodeTypeIcon(nodeData.primaryType);
+  const nodeLabel = (nodeData.primaryType === 'Gene' || nodeData.primaryType === 'Protein') 
+    ? nodeData.label.toUpperCase()
+    : capitalizeAllWords(nodeData.label);
+
   return (
     <div
       className={`${styles.node} ${selected ? styles.selected : ''}`}
@@ -16,15 +22,10 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
     >
       <Handle type="target" position={Position.Top} />
 
-      <div className={styles.label} title={nodeData.label}>
-        {nodeData.label}
-      </div>
+      {nodeTypeIcon}
 
-      <div className={styles.typeBadge}>
-        <svg className={styles.icon} viewBox="0 0 16 16">
-          <circle cx="8" cy="8" r="6" />
-        </svg>
-        {nodeData.primaryType}
+      <div className={styles.label} title={nodeData.label}>
+        {nodeLabel}
       </div>
 
       <Handle type="source" position={Position.Bottom} />

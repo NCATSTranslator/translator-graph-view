@@ -6,6 +6,7 @@ import type {
   FlowEdge,
   GraphNodeData,
   GraphEdgeData,
+  EdgeType,
 } from '../types';
 import { getColorForType, simplifyTypeName, getPrimaryType } from './colorGenerator';
 
@@ -34,8 +35,6 @@ export function transformNodesToFlow(data: GraphData): FlowNode[] {
       type: 'graphNode',
       position: { x: 0, y: 0 }, // Will be set by layout
       data: nodeData,
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
     };
   });
 }
@@ -43,11 +42,17 @@ export function transformNodesToFlow(data: GraphData): FlowNode[] {
 /**
  * Convert GraphData to ReactFlow edges
  */
-export function transformEdgesToFlow(data: GraphData): FlowEdge[] {
+export function transformEdgesToFlow(
+  data: GraphData,
+  edgeType?: EdgeType,
+  showLabels?: boolean,
+): FlowEdge[] {
   return Object.values(data.edges).map((edge) => {
     const edgeData: GraphEdgeData = {
       label: formatPredicate(edge.predicate),
       graphEdge: edge,
+      edgeType,
+      showLabel: showLabels,
     };
 
     return {
