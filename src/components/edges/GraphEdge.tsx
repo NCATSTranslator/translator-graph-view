@@ -1,12 +1,38 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
+  getStraightPath,
   getBezierPath,
+  getSmoothStepPath,
   type EdgeProps,
 } from '@xyflow/react';
-import type { GraphEdgeData } from '../../types';
+import type { GraphEdgeData, EdgeType } from '../../types';
 import styles from './GraphEdge.module.scss';
+
+function getEdgePath(
+  type: EdgeType,
+  params: {
+    sourceX: number;
+    sourceY: number;
+    sourcePosition: EdgeProps['sourcePosition'];
+    targetX: number;
+    targetY: number;
+    targetPosition: EdgeProps['targetPosition'];
+  }
+): [string, number, number, number, number] {
+  switch (type) {
+    case 'bezier':
+      return getBezierPath(params);
+    case 'step':
+      return getSmoothStepPath({ ...params, borderRadius: 0 });
+    case 'smoothstep':
+      return getSmoothStepPath(params);
+    case 'straight':
+    default:
+      return getStraightPath(params);
+  }
+}
 
 function GraphEdgeComponent({
   id,
@@ -20,17 +46,24 @@ function GraphEdgeComponent({
   selected,
   markerEnd,
 }: EdgeProps) {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-
   const edgeData = data as GraphEdgeData | undefined;
-  const label = edgeData?.label || '';
+  const edgeType: EdgeType = edgeData?.edgeType ?? 'straight';
+
+  const [edgePath, labelX, labelY] = useMemo(
+    () =>
+      getEdgePath(edgeType, {
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+      }),
+    [edgeType, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition]
+  );
+
+  const showLabel = edgeData?.showLabel ?? true;
+  const label = showLabel ? edgeData?.label || '' : '';
 
   return (
     <>

@@ -31,6 +31,7 @@ export type {
   GraphEdge as GraphEdgeType,
   GraphViewProps,
   LayoutType,
+  EdgeType,
   Selection,
   Result,
   Path,
