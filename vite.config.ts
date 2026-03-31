@@ -1,5 +1,6 @@
 import { defineConfig, type CSSOptions } from 'vite';
 import react from '@vitejs/plugin-react';
+import svgr from 'vite-plugin-svgr';
 import dts from 'vite-plugin-dts';
 import { resolve } from 'path';
 
@@ -15,7 +16,7 @@ export default defineConfig(({ mode }) => {
   if (mode === 'development') {
     return {
       css: cssConfig,
-      plugins: [react()],
+      plugins: [react(), svgr()],
       root: '.',
       publicDir: false,
       resolve: {
@@ -30,6 +31,7 @@ export default defineConfig(({ mode }) => {
     css: cssConfig,
     plugins: [
       react(),
+      svgr(),
       dts({
         include: ['src'],
         outDir: 'dist',
