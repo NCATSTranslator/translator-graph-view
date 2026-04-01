@@ -8,7 +8,6 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
-  MarkerType,
   SelectionMode,
   type NodeTypes,
   type EdgeTypes,
@@ -35,13 +34,7 @@ const edgeTypes: EdgeTypes = {
 };
 
 const defaultEdgeOptions = {
-  type: 'graphEdge',
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    width: 20,
-    height: 20,
-    color: '#888',
-  },
+  type: 'graphEdge'
 };
 
 interface GraphViewInnerProps extends GraphViewProps {
