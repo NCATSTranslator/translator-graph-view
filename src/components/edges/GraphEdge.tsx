@@ -53,10 +53,10 @@ function GraphEdgeComponent({
     () =>
       getEdgePath(edgeType, {
         sourceX,
-        sourceY,
+        sourceY: sourceY - 16,
         sourcePosition,
         targetX,
-        targetY,
+        targetY: targetY + 16,
         targetPosition,
       }),
     [edgeType, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition]
