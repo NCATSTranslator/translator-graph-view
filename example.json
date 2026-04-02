@@ -40,7 +40,8 @@
         "0ac23e70",
         "7c0d3d3a",
         "43a2857a"
-      ]
+      ],
+      "inferred": true
     },
     {
       "id": "67bb6ae0",
@@ -49,7 +50,8 @@
       "object": "MONDO:0007243",
       "paths": [
         "1fa7ca9d"
-      ]
+      ],
+      "inferred": true
     }
   ],
   "nodes": {
@@ -4499,6 +4501,7 @@
       "description": "Holds between an substance, procedure, or activity and a medical condition (disease or phenotypic feature), and states that the substance, procedure, or activity is able to treat the condition, has been observed to be taken/prescribed in practice with the intent of treating the condition, or has been interrogated in a scientific study that hypothesized an ability to treat the condition (in humans or other biological systems/organisms)."
     },
     "56096d25": {
+      "inferred": true,
       "id": "56096d25",
       "subject": "CHEBI:44185",
       "object": "UMLS:C0278879",
