@@ -7,8 +7,8 @@
   padding: 4px 8px;
   min-width: 60px;
   max-width: 200px;
-  background: white;
-  border: 1px solid var(--node-color, #ccc);
+  background-color: #DCDCE6;
+  color: #202124;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0);
   cursor: pointer;
@@ -23,7 +23,7 @@
 
   &.selected {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transform: scale(1.02);
+    transform: scale(1.05);
   }
 }
 
@@ -35,6 +35,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
+  max-width: calc(100% - 8px);
   line-height: 1.25;
+  padding: 0 4px;
 }
