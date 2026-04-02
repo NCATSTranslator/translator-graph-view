@@ -24,6 +24,7 @@ export interface GraphEdge {
   predicate: string;
   predicate_url?: string;
   knowledge_level?: string;
+  inferred?: boolean;
   provenance?: Provenance[];
   publications?: { inferred?: Publication[] };
   trials?: Trial[];
@@ -96,6 +97,9 @@ export interface GraphEdgeData extends Record<string, unknown> {
   edgeType?: EdgeType;
   showLabel?: boolean;
   selected?: boolean;
+  inferred?: boolean;
+  edgeIndex?: number;
+  edgeTotalCount?: number;
 }
 
 // ReactFlow typed nodes and edges
@@ -113,5 +117,6 @@ export interface GraphViewProps {
   onNodeClick?: (node: GraphNode) => void;
   onEdgeClick?: (edge: GraphEdge) => void;
   selectedIds?: string[];
+  multiEdgeSpacing?: number;
   className?: string;
 }

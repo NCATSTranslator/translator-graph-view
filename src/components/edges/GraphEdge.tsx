@@ -8,6 +8,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import type { GraphEdgeData, EdgeType } from '../../types';
+import { useGraphSettings } from '../../hooks/useGraphSettings';
 import styles from './GraphEdge.module.scss';
 
 function getEdgePath(
@@ -34,6 +35,41 @@ function getEdgePath(
   }
 }
 
+/**
+ * Compute a quadratic bezier path with the control point offset
+ * perpendicular to the straight line between source and target.
+ * Returns [pathString, labelX, labelY].
+ */
+function getMultiEdgePath(
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+  edgeIndex: number,
+  edgeTotalCount: number,
+  spacing: number,
+): [string, number, number] {
+  const offset = (edgeIndex - (edgeTotalCount - 1) / 2) * spacing;
+
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+  // Perpendicular unit vector
+  const px = -dy / len;
+  const py = dx / len;
+
+  // Control point at the midpoint, offset perpendicularly
+  const mx = (sx + tx) / 2 + px * offset;
+  const my = (sy + ty) / 2 + py * offset;
+
+  // Label sits at the quadratic bezier midpoint (t=0.5)
+  const labelX = 0.25 * sx + 0.5 * mx + 0.25 * tx;
+  const labelY = 0.25 * sy + 0.5 * my + 0.25 * ty;
+
+  return [`M ${sx} ${sy} Q ${mx} ${my} ${tx} ${ty}`, labelX, labelY];
+}
+
 function GraphEdgeComponent({
   id,
   sourceX,
@@ -46,24 +82,48 @@ function GraphEdgeComponent({
   selected,
   markerEnd,
 }: EdgeProps) {
+  const { multiEdgeSpacing } = useGraphSettings();
   const edgeData = data as GraphEdgeData | undefined;
   const edgeType: EdgeType = edgeData?.edgeType ?? 'straight';
+  const inferred = edgeData?.inferred ?? false;
+  const edgeIndex = edgeData?.edgeIndex;
+  const edgeTotalCount = edgeData?.edgeTotalCount;
+  const isMultiEdge = edgeTotalCount != null && edgeTotalCount > 1 && edgeIndex != null;
 
-  const [edgePath, labelX, labelY] = useMemo(
-    () =>
-      getEdgePath(edgeType, {
-        sourceX,
-        sourceY: sourceY - 16,
-        sourcePosition,
-        targetX,
-        targetY: targetY + 16,
-        targetPosition,
-      }),
-    [edgeType, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition]
-  );
+  const adjustedSourceY = sourceY - 16;
+  const adjustedTargetY = targetY + 16;
+
+  const [edgePath, labelX, labelY] = useMemo(() => {
+    if (isMultiEdge) {
+      return getMultiEdgePath(
+        sourceX, adjustedSourceY,
+        targetX, adjustedTargetY,
+        edgeIndex, edgeTotalCount,
+        multiEdgeSpacing,
+      );
+    }
+    return getEdgePath(edgeType, {
+      sourceX,
+      sourceY: adjustedSourceY,
+      sourcePosition,
+      targetX,
+      targetY: adjustedTargetY,
+      targetPosition,
+    });
+  }, [
+    isMultiEdge, edgeIndex, edgeTotalCount, multiEdgeSpacing,
+    edgeType, sourceX, adjustedSourceY, sourcePosition,
+    targetX, adjustedTargetY, targetPosition,
+  ]);
 
   const showLabel = edgeData?.showLabel ?? true;
   const label = showLabel ? edgeData?.label || '' : '';
+
+  const pathClassName = [
+    styles.edgePath,
+    selected ? styles.selected : '',
+    inferred ? styles.inferred : '',
+  ].filter(Boolean).join(' ');
 
   return (
     <>
@@ -71,29 +131,18 @@ function GraphEdgeComponent({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        className={`${styles.edgePath} ${selected ? styles.selected : ''}`}
+        className={pathClassName}
       />
       {label && (
         <EdgeLabelRenderer>
           <div
             style={{
-              position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: 'all',
             }}
-            className="nodrag nopan"
+            className={`nodrag nopan ${styles.edgeLabelContainer}`}
           >
             <div
-              style={{
-                background: 'white',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: '10px',
-                fontWeight: 500,
-                color: selected ? '#4285F4' : '#666',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                whiteSpace: 'nowrap',
-              }}
+              className={`${styles.edgeLabel} ${selected ? styles.selected : ''}`}
               title={edgeData?.graphEdge?.predicate}
             >
               {label}

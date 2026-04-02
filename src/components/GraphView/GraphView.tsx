@@ -11,7 +11,6 @@ import {
   SelectionMode,
   type NodeTypes,
   type EdgeTypes,
-  type OnSelectionChangeParams,
   type Node,
   type Edge,
 } from '@xyflow/react';
@@ -21,6 +20,7 @@ import type { GraphViewProps, FlowNode, FlowEdge, GraphNodeData } from '../../ty
 import { transformNodesToFlow, transformEdgesToFlow } from '../../utils';
 import { useGraphLayout } from '../../hooks/useGraphLayout';
 import { useSelection } from '../../hooks/useSelection';
+import { GraphSettingsContext, type GraphSettings } from '../../hooks/useGraphSettings';
 import { GraphNode } from '../nodes';
 import { GraphEdge } from '../edges';
 import styles from './GraphView.module.scss';
@@ -77,9 +77,10 @@ function GraphViewInner({
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       // Fit view after layout
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         fitView({ padding: 0.1, duration: 200 });
       }, 50);
+      return () => clearTimeout(timer);
     }
   }, [layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView]);
 
@@ -126,13 +127,6 @@ function GraphViewInner({
     [data, onEdgeClick]
   );
 
-  const onSelectionChangeHandler = useCallback(
-    (params: OnSelectionChangeParams) => {
-      handleSelectionChange(params);
-    },
-    [handleSelectionChange]
-  );
-
   const minimapNodeColor = useCallback((node: Node) => {
     const nodeData = node.data as GraphNodeData | undefined;
     return nodeData?.color || '#888';
@@ -150,7 +144,7 @@ function GraphViewInner({
       onEdgesChange={onEdgesChange}
       onNodeClick={handleNodeClick}
       onEdgeClick={handleEdgeClick}
-      onSelectionChange={onSelectionChangeHandler}
+      onSelectionChange={handleSelectionChange}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       defaultEdgeOptions={defaultEdgeOptions}
@@ -179,7 +173,7 @@ function GraphViewInner({
 }
 
 export function GraphView(props: GraphViewProps) {
-  const { data, edgeType, showEdgeLabels = true } = props;
+  const { data, edgeType, showEdgeLabels = true, multiEdgeSpacing } = props;
 
   const initialNodes = useMemo(() => transformNodesToFlow(data), [data]);
   const initialEdges = useMemo(
@@ -187,13 +181,20 @@ export function GraphView(props: GraphViewProps) {
     [data, edgeType, showEdgeLabels],
   );
 
+  const settings = useMemo<GraphSettings>(
+    () => ({ multiEdgeSpacing: multiEdgeSpacing ?? 60 }),
+    [multiEdgeSpacing],
+  );
+
   return (
     <ReactFlowProvider>
-      <GraphViewInner
-        {...props}
-        initialNodes={initialNodes}
-        initialEdges={initialEdges}
-      />
+      <GraphSettingsContext.Provider value={settings}>
+        <GraphViewInner
+          {...props}
+          initialNodes={initialNodes}
+          initialEdges={initialEdges}
+        />
+      </GraphSettingsContext.Provider>
     </ReactFlowProvider>
   );
 }
