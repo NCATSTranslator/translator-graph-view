@@ -41,7 +41,7 @@ export function useGraphLayout({
   const [layoutedEdges, setLayoutedEdges] = useState<FlowEdge[]>(edges);
   const [isLayouting, setIsLayouting] = useState(false);
 
-  const applyLayout = useCallback(async () => {
+  const applyLayout = useCallback(async (cancelled: () => boolean) => {
     if (nodes.length === 0) {
       setLayoutedNodes([]);
       setLayoutedEdges([]);
@@ -72,6 +72,8 @@ export function useGraphLayout({
 
       const layoutedGraph = await elk.layout(elkGraph);
 
+      if (cancelled()) return;
+
       if (layoutedGraph.children) {
         const positionMap = new Map<string, { x: number; y: number }>();
         for (const child of layoutedGraph.children) {
@@ -93,17 +95,22 @@ export function useGraphLayout({
         setLayoutedEdges(edges);
       }
     } catch (error) {
+      if (cancelled()) return;
       console.error('Layout error:', error);
       // Fall back to original positions
       setLayoutedNodes(nodes);
       setLayoutedEdges(edges);
     } finally {
-      setIsLayouting(false);
+      if (!cancelled()) {
+        setIsLayouting(false);
+      }
     }
   }, [nodes, edges, layout, elk]);
 
   useEffect(() => {
-    applyLayout();
+    let stale = false;
+    applyLayout(() => stale);
+    return () => { stale = true; };
   }, [applyLayout]);
 
   return {
