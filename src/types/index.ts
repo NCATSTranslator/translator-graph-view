@@ -71,7 +71,7 @@ export interface Provenance {
 }
 
 // Layout types
-export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid';
+export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid' | 'radial';
 
 // Edge path types
 export type EdgeType = 'bezier' | 'straight' | 'step' | 'smoothstep';

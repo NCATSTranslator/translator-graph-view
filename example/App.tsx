@@ -1,15 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GraphView, type GraphData, type LayoutType, type Selection, type GraphNodeType, type GraphEdgeType } from '../src';
+import { smallGraph, mediumGraph } from './sampleData';
+
+type DatasetKey = 'small' | 'medium' | 'large';
+
+const DATASETS: Array<{ label: string; key: DatasetKey }> = [
+  { label: 'Small', key: 'small' },
+  { label: 'Medium', key: 'medium' },
+  { label: 'Large', key: 'large' },
+];
 
 const LAYOUTS: Array<{ label: string; type: LayoutType }> = [
   { label: 'Top ↓ Bottom', type: 'hierarchical' },
   { label: 'Left → Right', type: 'hierarchicalLR' },
   { label: 'Force', type: 'force' },
   { label: 'Grid', type: 'grid' },
+  { label: 'Radial', type: 'radial' },
 ];
 
 function App() {
-  const [data, setData] = useState<GraphData | null>(null);
+  const [largeData, setLargeData] = useState<GraphData | null>(null);
+  const [dataset, setDataset] = useState<DatasetKey>('large');
   const [layout, setLayout] = useState<LayoutType>('hierarchical');
   const [selection, setSelection] = useState<Selection>({ nodes: [], edges: [] });
   const [error, setError] = useState<string | null>(null);
@@ -21,17 +32,18 @@ function App() {
         return res.json();
       })
       .then((json) => {
-        // Validate that we have nodes and edges
         if (!json.nodes || !json.edges) {
           throw new Error('Invalid data: missing nodes or edges');
         }
-        setData(json as GraphData);
+        setLargeData(json as GraphData);
       })
       .catch((err) => {
         console.error('Error loading data:', err);
         setError(err.message);
       });
   }, []);
+
+  const data = dataset === 'small' ? smallGraph : dataset === 'medium' ? mediumGraph : largeData;
 
   const handleSelectionChange = useCallback((newSelection: Selection) => {
     setSelection(newSelection);
@@ -65,6 +77,24 @@ function App() {
     <div style={styles.container}>
       <div style={styles.sidebar}>
         <h2 style={styles.title}>Graph View</h2>
+
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Dataset</h3>
+          <div style={styles.buttonGroup}>
+            {DATASETS.map((d) => (
+              <button
+                key={d.key}
+                onClick={() => setDataset(d.key)}
+                style={{
+                  ...styles.button,
+                  ...(dataset === d.key ? styles.buttonActive : {}),
+                }}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Layout</h3>
@@ -144,6 +174,7 @@ function App() {
           onSelectionChange={handleSelectionChange}
           onNodeClick={handleNodeClick}
           onEdgeClick={handleEdgeClick}
+          showEdgeLabels={false}
         />
       </div>
     </div>
