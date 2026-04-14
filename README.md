@@ -7,9 +7,12 @@ Renders [Biolink Model](https://biolink.github.io/biolink-model/) knowledge grap
 ## Features
 
 - Interactive graph visualization with pan, zoom, and selection
-- Four automatic layout algorithms: hierarchical, force-directed, and grid
+- Five automatic layout algorithms: hierarchical, force-directed, grid, and radial
 - Nodes color-coded by Biolink type
 - Controlled and uncontrolled selection modes
+- Controlled hover state with event callbacks
+- Multi-edge rendering with curved paths for parallel edges
+- Inferred edge styling (dashed stroke)
 - MiniMap and zoom controls
 - Full TypeScript type definitions
 - ESM and CommonJS support
@@ -69,7 +72,14 @@ The `GraphView` container must have a defined width and height.
 | `onSelectionChange` | `(selection: Selection) => void` | - | Fires when selection changes |
 | `onNodeClick` | `(node: GraphNode) => void` | - | Fires when a node is clicked |
 | `onEdgeClick` | `(edge: GraphEdge) => void` | - | Fires when an edge is clicked |
+| `onNodeHover` | `(node: GraphNode \| null) => void` | - | Fires when a node is hovered or unhovered |
+| `onEdgeHover` | `(edge: GraphEdge \| null) => void` | - | Fires when an edge is hovered or unhovered |
+| `hoveredNodeId` | `string \| null` | - | Controlled hover: highlights the given node |
+| `hoveredEdgeId` | `string \| null` | - | Controlled hover: highlights the given edge |
 | `selectedIds` | `string[]` | - | Controlled selection by node/edge ID |
+| `edgeType` | `EdgeType` | `'straight'` | Edge path style: `'bezier'`, `'straight'`, `'step'`, or `'smoothstep'` |
+| `showEdgeLabels` | `boolean` | `true` | Show predicate labels on edges |
+| `multiEdgeSpacing` | `number` | `60` | Pixel spacing between parallel edges sharing the same node pair |
 | `className` | `string` | - | Additional CSS class for the container |
 
 #### `elkWorkerUrl`
@@ -82,12 +92,63 @@ const elkWorkerUrl = new URL('elkjs/lib/elk-worker.min.js', import.meta.url).hre
 
 For webpack or other bundlers, serve `node_modules/elkjs/lib/elk-worker.min.js` as a static asset and pass its URL.
 
+### Hover
+
+The component supports both **uncontrolled** hover (internal styling only) and **controlled** hover (you drive the highlight state from outside). Use controlled hover to synchronize highlights between the graph and an external UI like a sidebar or detail panel.
+
+**Uncontrolled** — nodes and edges show hover styles on mouseover with no props needed.
+
+**Outbound events** — use `onNodeHover` / `onEdgeHover` to react to hover changes:
+
+```tsx
+const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  onNodeHover={(node) => setHoveredNode(node)}
+/>
+
+{hoveredNode && <div>Hovering: {hoveredNode.names[0]}</div>}
+```
+
+**Controlled (bidirectional)** — pass `hoveredNodeId` / `hoveredEdgeId` to drive highlights from external UI (e.g. a sidebar list), and use `onNodeHover` / `onEdgeHover` to update that state when the user hovers inside the graph:
+
+```tsx
+const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+// Sidebar list item triggers graph highlight
+<li
+  onMouseEnter={() => setHoveredNodeId(node.id)}
+  onMouseLeave={() => setHoveredNodeId(null)}
+>
+  {node.names[0]}
+</li>
+
+// Graph triggers sidebar highlight
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  hoveredNodeId={hoveredNodeId}
+  onNodeHover={(node) => setHoveredNodeId(node?.id ?? null)}
+/>
+```
+
+### Multi-edge rendering
+
+When multiple edges connect the same pair of nodes, they automatically spread into distinct quadratic bezier curves. Control the spacing with `multiEdgeSpacing` (default `60`px).
+
+### Inferred edges
+
+Edges with `inferred: true` in the data render with a dashed stroke to visually distinguish them from direct evidence edges.
+
 ### Layout types
 
 - `'hierarchical'` - Layered top-to-bottom (default)
 - `'hierarchicalLR'` - Layered left-to-right
 - `'force'` - Force-directed
 - `'grid'` - Box/grid
+- `'radial'` - Radial/circular
 
 ### Data format
 
@@ -109,6 +170,7 @@ interface GraphEdge {
   subject: string;       // source node ID
   object: string;        // target node ID
   predicate: string;     // e.g. 'biolink:treats'
+  inferred?: boolean;    // renders with dashed stroke when true
 }
 ```
 
