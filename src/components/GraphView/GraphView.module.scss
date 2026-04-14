@@ -2,6 +2,10 @@
   width: 100%;
   height: 100%;
   background-color: #fafafa;
+  --xy-edge-stroke: #888;
+  --xy-edge-stroke-width: 2;
+  --xy-edge-stroke-selected: #4285F4;
+  --xy-edge-stroke-hover: #666;
 
   :global {
     .react-flow__node {
@@ -21,16 +25,6 @@
 
     .react-flow__node:hover .react-flow__handle {
       opacity: 1;
-    }
-
-    .react-flow__edge-path {
-      stroke: #888;
-      stroke-width: 2;
-    }
-
-    .react-flow__edge.selected .react-flow__edge-path {
-      stroke: #4285F4;
-      stroke-width: 3;
     }
 
     .react-flow__selection {

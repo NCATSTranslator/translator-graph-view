@@ -24,6 +24,7 @@ export interface GraphEdge {
   predicate: string;
   predicate_url?: string;
   knowledge_level?: string;
+  inferred?: boolean;
   provenance?: Provenance[];
   publications?: { inferred?: Publication[] };
   trials?: Trial[];
@@ -70,7 +71,7 @@ export interface Provenance {
 }
 
 // Layout types
-export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid';
+export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid' | 'radial';
 
 // Edge path types
 export type EdgeType = 'bezier' | 'straight' | 'step' | 'smoothstep';
@@ -88,6 +89,7 @@ export interface GraphNodeData extends Record<string, unknown> {
   primaryType: string;
   color: string;
   selected?: boolean;
+  hovered?: boolean;
 }
 
 export interface GraphEdgeData extends Record<string, unknown> {
@@ -96,6 +98,10 @@ export interface GraphEdgeData extends Record<string, unknown> {
   edgeType?: EdgeType;
   showLabel?: boolean;
   selected?: boolean;
+  inferred?: boolean;
+  edgeIndex?: number;
+  edgeTotalCount?: number;
+  hovered?: boolean;
 }
 
 // ReactFlow typed nodes and edges
@@ -112,6 +118,11 @@ export interface GraphViewProps {
   onSelectionChange?: (selection: Selection) => void;
   onNodeClick?: (node: GraphNode) => void;
   onEdgeClick?: (edge: GraphEdge) => void;
+  onNodeHover?: (node: GraphNode | null) => void;
+  onEdgeHover?: (edge: GraphEdge | null) => void;
+  hoveredNodeId?: string | null;
+  hoveredEdgeId?: string | null;
   selectedIds?: string[];
+  multiEdgeSpacing?: number;
   className?: string;
 }

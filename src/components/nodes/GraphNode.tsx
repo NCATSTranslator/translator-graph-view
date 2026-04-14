@@ -11,13 +11,19 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
   } as React.CSSProperties;
 
   const nodeTypeIcon = getNodeTypeIcon(nodeData.primaryType);
-  const nodeLabel = (nodeData.primaryType === 'Gene' || nodeData.primaryType === 'Protein') 
+  const nodeLabel = (nodeData.primaryType === 'Gene' || nodeData.primaryType === 'Protein')
     ? nodeData.label.toUpperCase()
     : capitalizeAllWords(nodeData.label);
 
+  const className = [
+    styles.node,
+    selected ? styles.selected : '',
+    nodeData.hovered ? styles.hovered : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
-      className={`${styles.node} ${selected ? styles.selected : ''}`}
+      className={className}
       style={nodeStyle}
     >
       <Handle type="target" position={Position.Top} />

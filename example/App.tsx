@@ -1,18 +1,65 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { GraphView, type GraphData, type LayoutType, type Selection, type GraphNodeType, type GraphEdgeType } from '../src';
+import { smallGraph, mediumGraph } from './sampleData';
+
+type DatasetKey = 'small' | 'medium' | 'large';
+
+const DATASETS: Array<{ label: string; key: DatasetKey }> = [
+  { label: 'Small', key: 'small' },
+  { label: 'Medium', key: 'medium' },
+  { label: 'Large', key: 'large' },
+];
+
+const ELK_WORKER_URL = new URL('elkjs/lib/elk-worker.min.js', import.meta.url).href;
 
 const LAYOUTS: Array<{ label: string; type: LayoutType }> = [
   { label: 'Top ↓ Bottom', type: 'hierarchical' },
   { label: 'Left → Right', type: 'hierarchicalLR' },
   { label: 'Force', type: 'force' },
   { label: 'Grid', type: 'grid' },
+  { label: 'Radial', type: 'radial' },
 ];
 
 function App() {
-  const [data, setData] = useState<GraphData | null>(null);
+  const [largeData, setLargeData] = useState<GraphData | null>(null);
+  const [dataset, setDataset] = useState<DatasetKey>('large');
   const [layout, setLayout] = useState<LayoutType>('hierarchical');
   const [selection, setSelection] = useState<Selection>({ nodes: [], edges: [] });
   const [error, setError] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<GraphNodeType | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<GraphEdgeType | null>(null);
+  const [sidebarHoveredNodeId, setSidebarHoveredNodeId] = useState<string | null>(null);
+  const [sidebarHoveredEdgeId, setSidebarHoveredEdgeId] = useState<string | null>(null);
+  const [tooltipNode, setTooltipNode] = useState<GraphNodeType | null>(null);
+  const [tooltipEdge, setTooltipEdge] = useState<GraphEdgeType | null>(null);
+  const nodeTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const edgeTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hoveredNodeRef = useRef(hoveredNode);
+  hoveredNodeRef.current = hoveredNode;
+  const hoveredEdgeRef = useRef(hoveredEdge);
+  hoveredEdgeRef.current = hoveredEdge;
+  const mousePosRef = useRef({ x: 0, y: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    clearTimeout(nodeTooltipTimerRef.current);
+    if (hoveredNode) {
+      nodeTooltipTimerRef.current = setTimeout(() => setTooltipNode(hoveredNodeRef.current), 250);
+    } else {
+      setTooltipNode(null);
+    }
+    return () => clearTimeout(nodeTooltipTimerRef.current);
+  }, [hoveredNode]);
+
+  useEffect(() => {
+    clearTimeout(edgeTooltipTimerRef.current);
+    if (hoveredEdge) {
+      edgeTooltipTimerRef.current = setTimeout(() => setTooltipEdge(hoveredEdgeRef.current), 250);
+    } else {
+      setTooltipEdge(null);
+    }
+    return () => clearTimeout(edgeTooltipTimerRef.current);
+  }, [hoveredEdge]);
 
   useEffect(() => {
     fetch('./example.json')
@@ -21,17 +68,18 @@ function App() {
         return res.json();
       })
       .then((json) => {
-        // Validate that we have nodes and edges
         if (!json.nodes || !json.edges) {
           throw new Error('Invalid data: missing nodes or edges');
         }
-        setData(json as GraphData);
+        setLargeData(json as GraphData);
       })
       .catch((err) => {
         console.error('Error loading data:', err);
         setError(err.message);
       });
   }, []);
+
+  const data = dataset === 'small' ? smallGraph : dataset === 'medium' ? mediumGraph : largeData;
 
   const handleSelectionChange = useCallback((newSelection: Selection) => {
     setSelection(newSelection);
@@ -43,6 +91,22 @@ function App() {
 
   const handleEdgeClick = useCallback((edge: GraphEdgeType) => {
     console.log('Edge clicked:', edge);
+  }, []);
+
+  const handleNodeHover = useCallback((node: GraphNodeType | null) => {
+    setHoveredNode(node);
+  }, []);
+
+  const handleEdgeHover = useCallback((edge: GraphEdgeType | null) => {
+    setHoveredEdge(edge);
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    mousePosRef.current = { x: e.clientX, y: e.clientY };
+    if (tooltipRef.current) {
+      tooltipRef.current.style.left = `${e.clientX + 12}px`;
+      tooltipRef.current.style.top = `${e.clientY + 12}px`;
+    }
   }, []);
 
   if (error) {
@@ -65,6 +129,24 @@ function App() {
     <div style={styles.container}>
       <div style={styles.sidebar}>
         <h2 style={styles.title}>Graph View</h2>
+
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Dataset</h3>
+          <div style={styles.buttonGroup}>
+            {DATASETS.map((d) => (
+              <button
+                key={d.key}
+                onClick={() => setDataset(d.key)}
+                style={{
+                  ...styles.button,
+                  ...(dataset === d.key ? styles.buttonActive : {}),
+                }}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Layout</h3>
@@ -95,7 +177,15 @@ function App() {
               <strong>Selected Nodes:</strong>
               <ul style={styles.list}>
                 {selection.nodes.map((node) => (
-                  <li key={node.id} style={styles.listItem}>
+                  <li
+                    key={node.id}
+                    style={{
+                      ...styles.listItem,
+                      ...(sidebarHoveredNodeId === node.id ? styles.listItemHovered : {}),
+                    }}
+                    onMouseEnter={() => setSidebarHoveredNodeId(node.id)}
+                    onMouseLeave={() => setSidebarHoveredNodeId(null)}
+                  >
                     {node.names[0] || node.id}
                   </li>
                 ))}
@@ -107,13 +197,36 @@ function App() {
               <strong>Selected Edges:</strong>
               <ul style={styles.list}>
                 {selection.edges.map((edge) => (
-                  <li key={edge.id} style={styles.listItem}>
+                  <li
+                    key={edge.id}
+                    style={{
+                      ...styles.listItem,
+                      ...(sidebarHoveredEdgeId === edge.id ? styles.listItemHovered : {}),
+                    }}
+                    onMouseEnter={() => setSidebarHoveredEdgeId(edge.id)}
+                    onMouseLeave={() => setSidebarHoveredEdgeId(null)}
+                  >
                     {edge.predicate}
                   </li>
                 ))}
               </ul>
             </div>
           )}
+        </div>
+
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Hover</h3>
+          <div style={styles.selectionInfo}>
+            {hoveredNode && (
+              <div>Node: {hoveredNode.names[0] || hoveredNode.id}</div>
+            )}
+            {hoveredEdge && (
+              <div>Edge: {hoveredEdge.predicate}</div>
+            )}
+            {!hoveredNode && !hoveredEdge && (
+              <div style={{ color: '#adb5bd' }}>Hover over a node or edge</div>
+            )}
+          </div>
         </div>
 
         <div style={styles.section}>
@@ -136,15 +249,37 @@ function App() {
         </div>
       </div>
 
-      <div style={styles.graphContainer}>
+      <div style={styles.graphContainer} onMouseMove={handleMouseMove}>
         <GraphView
           data={data}
           layout={layout}
-          elkWorkerUrl={new URL('elkjs/lib/elk-worker.min.js', import.meta.url).href}
+          elkWorkerUrl={ELK_WORKER_URL}
           onSelectionChange={handleSelectionChange}
           onNodeClick={handleNodeClick}
           onEdgeClick={handleEdgeClick}
+          onNodeHover={handleNodeHover}
+          onEdgeHover={handleEdgeHover}
+          hoveredNodeId={sidebarHoveredNodeId}
+          hoveredEdgeId={sidebarHoveredEdgeId}
+          showEdgeLabels={false}
         />
+        {(tooltipNode || tooltipEdge) && (
+          <div
+            ref={tooltipRef}
+            style={{
+              ...styles.tooltip,
+              left: mousePosRef.current.x + 12,
+              top: mousePosRef.current.y + 12,
+            }}
+          >
+            {tooltipNode && (
+              <span><strong>Node:</strong> {tooltipNode.names[0] || tooltipNode.id}</span>
+            )}
+            {tooltipEdge && (
+              <span><strong>Edge:</strong> {tooltipEdge.predicate}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -230,6 +365,11 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    cursor: 'default',
+    transition: 'background-color 0.15s ease',
+  },
+  listItemHovered: {
+    backgroundColor: '#d0d4da',
   },
   stats: {
     padding: '12px',
@@ -249,6 +389,18 @@ const styles: Record<string, React.CSSProperties> = {
   graphContainer: {
     flex: 1,
     height: '100%',
+    position: 'relative',
+  },
+  tooltip: {
+    position: 'fixed',
+    backgroundColor: 'rgba(33, 37, 41, 0.85)',
+    color: '#fff',
+    padding: '6px 10px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    pointerEvents: 'none',
+    whiteSpace: 'nowrap',
+    zIndex: 1000,
   },
   loading: {
     display: 'flex',

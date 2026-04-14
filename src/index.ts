@@ -6,6 +6,8 @@ export { GraphEdge } from './components/edges';
 // Hooks
 export { useGraphLayout } from './hooks/useGraphLayout';
 export { useSelection } from './hooks/useSelection';
+export { useGraphSettings, GraphSettingsContext } from './hooks/useGraphSettings';
+export type { GraphSettings } from './hooks/useGraphSettings';
 
 // Layouts
 export { layoutConfigs, getLayoutOptions } from './layouts';

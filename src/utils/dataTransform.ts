@@ -40,19 +40,47 @@ export function transformNodesToFlow(data: GraphData): FlowNode[] {
 }
 
 /**
- * Convert GraphData to ReactFlow edges
+ * Build a normalized key for a source-target pair so that
+ * (A,B) and (B,A) are treated as the same pair.
+ */
+function pairKey(source: string, target: string): string {
+  return source < target ? `${source}::${target}` : `${target}::${source}`;
+}
+
+/**
+ * Convert GraphData to ReactFlow edges.
+ * Groups edges that share the same node pair and assigns each an index
+ * so the renderer can spread them into distinct curves.
  */
 export function transformEdgesToFlow(
   data: GraphData,
   edgeType?: EdgeType,
   showLabels?: boolean,
 ): FlowEdge[] {
-  return Object.values(data.edges).map((edge) => {
+  const edges = Object.values(data.edges);
+
+  // Count how many edges share each node pair
+  const pairCounts = new Map<string, number>();
+  const pairIndices = new Map<string, number>();
+  for (const edge of edges) {
+    const key = pairKey(edge.subject, edge.object);
+    pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+  }
+
+  return edges.map((edge) => {
+    const key = pairKey(edge.subject, edge.object);
+    const totalCount = pairCounts.get(key) ?? 1;
+    const index = pairIndices.get(key) ?? 0;
+    pairIndices.set(key, index + 1);
+
     const edgeData: GraphEdgeData = {
       label: formatPredicate(edge.predicate),
       graphEdge: edge,
       edgeType,
       showLabel: showLabels,
+      inferred: edge.inferred,
+      edgeIndex: totalCount > 1 ? index : undefined,
+      edgeTotalCount: totalCount > 1 ? totalCount : undefined,
     };
 
     return {
