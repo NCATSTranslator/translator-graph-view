@@ -8,6 +8,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import type { GraphEdgeData, EdgeType } from '../../types';
+import { NODE_HEIGHT } from '../../utils/dataTransform';
 import { useGraphSettings } from '../../hooks/useGraphSettings';
 import styles from './GraphEdge.module.scss';
 
@@ -70,6 +71,8 @@ function getMultiEdgePath(
   return [`M ${sx} ${sy} Q ${mx} ${my} ${tx} ${ty}`, labelX, labelY];
 }
 
+const EDGE_Y_OFFSET = NODE_HEIGHT / 2;
+
 function GraphEdgeComponent({
   id,
   sourceX,
@@ -90,39 +93,42 @@ function GraphEdgeComponent({
   const edgeTotalCount = edgeData?.edgeTotalCount;
   const isMultiEdge = edgeTotalCount != null && edgeTotalCount > 1 && edgeIndex != null;
 
-  const adjustedSourceY = sourceY - 16;
-  const adjustedTargetY = targetY + 16;
-
   const [edgePath, labelX, labelY] = useMemo(() => {
+    const adjSourceY = sourceY - EDGE_Y_OFFSET;
+    const adjTargetY = targetY + EDGE_Y_OFFSET;
+
     if (isMultiEdge) {
       return getMultiEdgePath(
-        sourceX, adjustedSourceY,
-        targetX, adjustedTargetY,
+        sourceX, adjSourceY,
+        targetX, adjTargetY,
         edgeIndex, edgeTotalCount,
         multiEdgeSpacing,
       );
     }
     return getEdgePath(edgeType, {
       sourceX,
-      sourceY: adjustedSourceY,
+      sourceY: adjSourceY,
       sourcePosition,
       targetX,
-      targetY: adjustedTargetY,
+      targetY: adjTargetY,
       targetPosition,
     });
   }, [
     isMultiEdge, edgeIndex, edgeTotalCount, multiEdgeSpacing,
-    edgeType, sourceX, adjustedSourceY, sourcePosition,
-    targetX, adjustedTargetY, targetPosition,
+    edgeType, sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
   ]);
 
   const showLabel = edgeData?.showLabel ?? true;
   const label = showLabel ? edgeData?.label || '' : '';
 
+  const hovered = edgeData?.hovered ?? false;
+
   const pathClassName = [
     styles.edgePath,
     selected ? styles.selected : '',
     inferred ? styles.inferred : '',
+    hovered ? styles.hovered : '',
   ].filter(Boolean).join(' ');
 
   return (
