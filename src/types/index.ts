@@ -108,6 +108,22 @@ export interface GraphEdgeData extends Record<string, unknown> {
 export type FlowNode = Node<GraphNodeData, 'graphNode'>;
 export type FlowEdge = Edge<GraphEdgeData>;
 
+// Hover geometry types
+export type HoverAnchorPosition =
+  | 'topLeft'    | 'topCenter'    | 'topRight'
+  | 'centerLeft' | 'center'       | 'centerRight'
+  | 'bottomLeft' | 'bottomCenter' | 'bottomRight'
+  | 'midpoint';
+
+export interface HoverGeometry {
+  /** Bounding rect of the hovered element in viewport (client) coordinates. */
+  rect: { x: number; y: number; width: number; height: number };
+  /** The anchor point (in viewport coords) corresponding to the requested HoverAnchorPosition. */
+  anchor: { x: number; y: number };
+  /** Which anchor position was used to compute `anchor`. */
+  anchorPosition: HoverAnchorPosition;
+}
+
 // Component props
 export interface GraphViewProps {
   data: GraphData;
@@ -118,10 +134,12 @@ export interface GraphViewProps {
   onSelectionChange?: (selection: Selection) => void;
   onNodeClick?: (node: GraphNode) => void;
   onEdgeClick?: (edge: GraphEdge) => void;
-  onNodeHover?: (node: GraphNode | null) => void;
-  onEdgeHover?: (edge: GraphEdge | null) => void;
+  onNodeHover?: (node: GraphNode | null, geometry: HoverGeometry | null) => void;
+  onEdgeHover?: (edge: GraphEdge | null, geometry: HoverGeometry | null) => void;
   hoveredNodeId?: string | null;
   hoveredEdgeId?: string | null;
+  nodeHoverAnchor?: HoverAnchorPosition;
+  edgeHoverAnchor?: HoverAnchorPosition;
   selectedIds?: string[];
   multiEdgeSpacing?: number;
   className?: string;

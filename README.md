@@ -72,10 +72,12 @@ The `GraphView` container must have a defined width and height.
 | `onSelectionChange` | `(selection: Selection) => void` | - | Fires when selection changes |
 | `onNodeClick` | `(node: GraphNode) => void` | - | Fires when a node is clicked |
 | `onEdgeClick` | `(edge: GraphEdge) => void` | - | Fires when an edge is clicked |
-| `onNodeHover` | `(node: GraphNode \| null) => void` | - | Fires when a node is hovered or unhovered |
-| `onEdgeHover` | `(edge: GraphEdge \| null) => void` | - | Fires when an edge is hovered or unhovered |
+| `onNodeHover` | `(node: GraphNode \| null, geometry: HoverGeometry \| null) => void` | - | Fires when a node is hovered or unhovered |
+| `onEdgeHover` | `(edge: GraphEdge \| null, geometry: HoverGeometry \| null) => void` | - | Fires when an edge is hovered or unhovered |
 | `hoveredNodeId` | `string \| null` | - | Controlled hover: highlights the given node |
 | `hoveredEdgeId` | `string \| null` | - | Controlled hover: highlights the given edge |
+| `nodeHoverAnchor` | `HoverAnchorPosition` | `'topCenter'` | Anchor point returned in `HoverGeometry` for node hovers |
+| `edgeHoverAnchor` | `HoverAnchorPosition` | `'midpoint'` | Anchor point returned in `HoverGeometry` for edge hovers |
 | `selectedIds` | `string[]` | - | Controlled selection by node/edge ID |
 | `edgeType` | `EdgeType` | `'straight'` | Edge path style: `'bezier'`, `'straight'`, `'step'`, or `'smoothstep'` |
 | `showEdgeLabels` | `boolean` | `true` | Show predicate labels on edges |
@@ -133,6 +135,35 @@ const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   onNodeHover={(node) => setHoveredNodeId(node?.id ?? null)}
 />
 ```
+
+#### Hover geometry
+
+The `onNodeHover` and `onEdgeHover` callbacks receive a second `HoverGeometry` argument containing the hovered element's bounding rect and a pre-computed anchor point in viewport coordinates — useful for positioning tooltips without querying the DOM yourself.
+
+```tsx
+import type { GraphNodeType, HoverGeometry } from 'translator-graph-view';
+
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  nodeHoverAnchor="topCenter"
+  onNodeHover={(node, geometry) => {
+    if (node && geometry) {
+      showTooltip({ x: geometry.anchor.x, y: geometry.anchor.y });
+    } else {
+      hideTooltip();
+    }
+  }}
+/>
+```
+
+`HoverAnchorPosition` can be one of: `'topLeft'`, `'topCenter'`, `'topRight'`, `'centerLeft'`, `'center'`, `'centerRight'`, `'bottomLeft'`, `'bottomCenter'`, `'bottomRight'`, or `'midpoint'` (edges only — computes the true midpoint of the SVG path).
+
+When the hover callback fires with `null` (mouse leaves), `geometry` is also `null`. If DOM measurement fails (e.g. SSR), `geometry` is `null`.
+
+While the pointer stays over the same node or edge, geometry is **re-measured on pan and zoom** (throttled with `requestAnimationFrame`) so anchors stay aligned with the viewport.
+
+DOM queries are **scoped to this `GraphView` instance**, so multiple graphs on one page do not pick each other’s elements. Element ids are escaped for attribute selectors (`CSS.escape` when available).
 
 ### Multi-edge rendering
 

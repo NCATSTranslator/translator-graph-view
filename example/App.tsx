@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GraphView, type GraphData, type LayoutType, type Selection, type GraphNodeType, type GraphEdgeType } from '../src';
+import {
+  GraphView,
+  type GraphData,
+  type LayoutType,
+  type Selection,
+  type GraphNodeType,
+  type GraphEdgeType,
+  type HoverGeometry,
+} from '../src';
 import { smallGraph, mediumGraph } from './sampleData';
 
 type DatasetKey = 'small' | 'medium' | 'large';
@@ -11,6 +19,8 @@ const DATASETS: Array<{ label: string; key: DatasetKey }> = [
 ];
 
 const ELK_WORKER_URL = new URL('elkjs/lib/elk-worker.min.js', import.meta.url).href;
+
+const TOOLTIP_OFFSET = { x: 12, y: 12 };
 
 const LAYOUTS: Array<{ label: string; type: LayoutType }> = [
   { label: 'Top ↓ Bottom', type: 'hierarchical' },
@@ -32,14 +42,14 @@ function App() {
   const [sidebarHoveredEdgeId, setSidebarHoveredEdgeId] = useState<string | null>(null);
   const [tooltipNode, setTooltipNode] = useState<GraphNodeType | null>(null);
   const [tooltipEdge, setTooltipEdge] = useState<GraphEdgeType | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoverGeometry, setHoverGeometry] = useState<HoverGeometry | null>(null);
   const nodeTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const edgeTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hoveredNodeRef = useRef(hoveredNode);
   hoveredNodeRef.current = hoveredNode;
   const hoveredEdgeRef = useRef(hoveredEdge);
   hoveredEdgeRef.current = hoveredEdge;
-  const mousePosRef = useRef({ x: 0, y: 0 });
-  const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     clearTimeout(nodeTooltipTimerRef.current);
@@ -93,19 +103,29 @@ function App() {
     console.log('Edge clicked:', edge);
   }, []);
 
-  const handleNodeHover = useCallback((node: GraphNodeType | null) => {
+  const handleNodeHover = useCallback((node: GraphNodeType | null, geometry: HoverGeometry | null) => {
     setHoveredNode(node);
+    setHoverGeometry(geometry);
+    if (node && geometry) {
+      setTooltipPos({
+        x: geometry.anchor.x + TOOLTIP_OFFSET.x,
+        y: geometry.anchor.y + TOOLTIP_OFFSET.y,
+      });
+    } else if (!node) {
+      setTooltipPos(null);
+    }
   }, []);
 
-  const handleEdgeHover = useCallback((edge: GraphEdgeType | null) => {
+  const handleEdgeHover = useCallback((edge: GraphEdgeType | null, geometry: HoverGeometry | null) => {
     setHoveredEdge(edge);
-  }, []);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    mousePosRef.current = { x: e.clientX, y: e.clientY };
-    if (tooltipRef.current) {
-      tooltipRef.current.style.left = `${e.clientX + 12}px`;
-      tooltipRef.current.style.top = `${e.clientY + 12}px`;
+    setHoverGeometry(geometry);
+    if (edge && geometry) {
+      setTooltipPos({
+        x: geometry.anchor.x + TOOLTIP_OFFSET.x,
+        y: geometry.anchor.y + TOOLTIP_OFFSET.y,
+      });
+    } else if (!edge) {
+      setTooltipPos(null);
     }
   }, []);
 
@@ -183,7 +203,10 @@ function App() {
                       ...styles.listItem,
                       ...(sidebarHoveredNodeId === node.id ? styles.listItemHovered : {}),
                     }}
-                    onMouseEnter={() => setSidebarHoveredNodeId(node.id)}
+                    onMouseEnter={() => {
+                      setSidebarHoveredNodeId(node.id);
+                      setHoverGeometry(null);
+                    }}
                     onMouseLeave={() => setSidebarHoveredNodeId(null)}
                   >
                     {node.names[0] || node.id}
@@ -203,7 +226,10 @@ function App() {
                       ...styles.listItem,
                       ...(sidebarHoveredEdgeId === edge.id ? styles.listItemHovered : {}),
                     }}
-                    onMouseEnter={() => setSidebarHoveredEdgeId(edge.id)}
+                    onMouseEnter={() => {
+                      setSidebarHoveredEdgeId(edge.id);
+                      setHoverGeometry(null);
+                    }}
                     onMouseLeave={() => setSidebarHoveredEdgeId(null)}
                   >
                     {edge.predicate}
@@ -222,6 +248,17 @@ function App() {
             )}
             {hoveredEdge && (
               <div>Edge: {hoveredEdge.predicate}</div>
+            )}
+            {hoverGeometry && (
+              <div style={styles.hoverGeometryMeta}>
+                <div>
+                  Anchor ({hoverGeometry.anchorPosition}):{' '}
+                  {Math.round(hoverGeometry.anchor.x)}, {Math.round(hoverGeometry.anchor.y)}
+                </div>
+                <div>
+                  Bounds: {Math.round(hoverGeometry.rect.width)}×{Math.round(hoverGeometry.rect.height)}
+                </div>
+              </div>
             )}
             {!hoveredNode && !hoveredEdge && (
               <div style={{ color: '#adb5bd' }}>Hover over a node or edge</div>
@@ -249,7 +286,7 @@ function App() {
         </div>
       </div>
 
-      <div style={styles.graphContainer} onMouseMove={handleMouseMove}>
+      <div style={styles.graphContainer}>
         <GraphView
           data={data}
           layout={layout}
@@ -261,15 +298,16 @@ function App() {
           onEdgeHover={handleEdgeHover}
           hoveredNodeId={sidebarHoveredNodeId}
           hoveredEdgeId={sidebarHoveredEdgeId}
+          nodeHoverAnchor="topCenter"
+          edgeHoverAnchor="midpoint"
           showEdgeLabels={false}
         />
-        {(tooltipNode || tooltipEdge) && (
+        {(tooltipNode || tooltipEdge) && tooltipPos && (
           <div
-            ref={tooltipRef}
             style={{
               ...styles.tooltip,
-              left: mousePosRef.current.x + 12,
-              top: mousePosRef.current.y + 12,
+              left: tooltipPos.x,
+              top: tooltipPos.y,
             }}
           >
             {tooltipNode && (
@@ -390,6 +428,12 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     height: '100%',
     position: 'relative',
+  },
+  hoverGeometryMeta: {
+    marginTop: '8px',
+    fontSize: '11px',
+    color: '#868e96',
+    lineHeight: 1.5,
   },
   tooltip: {
     position: 'fixed',

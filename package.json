@@ -1,6 +1,6 @@
 {
   "name": "translator-graph-view",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "React Typescript library for displaying knowledge graphs using ReactFlow and ELKjs.",
   "type": "module",
   "main": "./dist/index.cjs",

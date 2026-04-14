@@ -44,4 +44,6 @@ export type {
   GraphEdgeData,
   FlowNode,
   FlowEdge,
+  HoverAnchorPosition,
+  HoverGeometry,
 } from './types';

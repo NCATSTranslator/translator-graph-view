@@ -7,6 +7,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useOnViewportChange,
   ReactFlowProvider,
   SelectionMode,
   type NodeTypes,
@@ -18,6 +19,7 @@ import '@xyflow/react/dist/style.css';
 
 import type { GraphViewProps, FlowNode, FlowEdge, GraphNodeData, GraphEdgeData } from '../../types';
 import { transformNodesToFlow, transformEdgesToFlow } from '../../utils';
+import { measureNodeGeometry, measureEdgeGeometry } from '../../utils/hoverGeometry';
 import { useGraphLayout } from '../../hooks/useGraphLayout';
 import { useSelection } from '../../hooks/useSelection';
 import { GraphSettingsContext, type GraphSettings } from '../../hooks/useGraphSettings';
@@ -59,6 +61,8 @@ function GraphViewInner({
   onEdgeHover,
   hoveredNodeId,
   hoveredEdgeId,
+  nodeHoverAnchor = 'topCenter',
+  edgeHoverAnchor = 'midpoint',
   selectedIds,
   className,
   initialNodes,
@@ -154,6 +158,69 @@ function GraphViewInner({
   const dataRef = useRef(data);
   dataRef.current = data;
 
+  const graphSurfaceRef = useRef<HTMLDivElement>(null);
+  const hoverTargetRef = useRef<
+    | { kind: 'node'; id: string }
+    | { kind: 'edge'; id: string }
+    | null
+  >(null);
+  const onNodeHoverRef = useRef(onNodeHover);
+  onNodeHoverRef.current = onNodeHover;
+  const onEdgeHoverRef = useRef(onEdgeHover);
+  onEdgeHoverRef.current = onEdgeHover;
+  const nodeHoverAnchorRef = useRef(nodeHoverAnchor);
+  nodeHoverAnchorRef.current = nodeHoverAnchor;
+  const edgeHoverAnchorRef = useRef(edgeHoverAnchor);
+  edgeHoverAnchorRef.current = edgeHoverAnchor;
+  const rafHoverFlushRef = useRef<number | null>(null);
+
+  const cancelScheduledHoverFlush = useCallback(() => {
+    if (rafHoverFlushRef.current != null) {
+      cancelAnimationFrame(rafHoverFlushRef.current);
+      rafHoverFlushRef.current = null;
+    }
+  }, []);
+
+  const flushHoverGeometry = useCallback(() => {
+    const root = graphSurfaceRef.current;
+    const target = hoverTargetRef.current;
+    if (!root || !target) return;
+
+    if (target.kind === 'node') {
+      const cb = onNodeHoverRef.current;
+      if (!cb) return;
+      const graphNode = dataRef.current.nodes[target.id];
+      if (!graphNode) return;
+      const geometry = measureNodeGeometry(target.id, nodeHoverAnchorRef.current, root);
+      cb(graphNode, geometry);
+    } else {
+      const cb = onEdgeHoverRef.current;
+      if (!cb) return;
+      const graphEdge = dataRef.current.edges[target.id];
+      if (!graphEdge) return;
+      const geometry = measureEdgeGeometry(target.id, edgeHoverAnchorRef.current, root);
+      cb(graphEdge, geometry);
+    }
+  }, []);
+
+  const scheduleHoverGeometryFlush = useCallback(() => {
+    if (!hoverTargetRef.current) return;
+    if (rafHoverFlushRef.current != null) return;
+    rafHoverFlushRef.current = requestAnimationFrame(() => {
+      rafHoverFlushRef.current = null;
+      flushHoverGeometry();
+    });
+  }, [flushHoverGeometry]);
+
+  useOnViewportChange({
+    onChange: scheduleHoverGeometryFlush,
+    onEnd: scheduleHoverGeometryFlush,
+  });
+
+  useEffect(() => () => {
+    cancelScheduledHoverFlush();
+  }, [cancelScheduledHoverFlush]);
+
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       if (onNodeClick) {
@@ -180,44 +247,48 @@ function GraphViewInner({
 
   const handleNodeMouseEnter = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      if (onNodeHover) {
-        const graphNode = dataRef.current.nodes[node.id];
-        if (graphNode) {
-          onNodeHover(graphNode);
-        }
-      }
+      if (!onNodeHover) return;
+      const graphNode = dataRef.current.nodes[node.id];
+      if (!graphNode) return;
+      hoverTargetRef.current = { kind: 'node', id: node.id };
+      const geometry = measureNodeGeometry(node.id, nodeHoverAnchor, graphSurfaceRef.current);
+      onNodeHover(graphNode, geometry);
     },
-    [onNodeHover]
+    [onNodeHover, nodeHoverAnchor]
   );
 
   const handleNodeMouseLeave = useCallback(
     () => {
+      cancelScheduledHoverFlush();
+      hoverTargetRef.current = null;
       if (onNodeHover) {
-        onNodeHover(null);
+        onNodeHover(null, null);
       }
     },
-    [onNodeHover]
+    [onNodeHover, cancelScheduledHoverFlush]
   );
 
   const handleEdgeMouseEnter = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
-      if (onEdgeHover) {
-        const graphEdge = dataRef.current.edges[edge.id];
-        if (graphEdge) {
-          onEdgeHover(graphEdge);
-        }
-      }
+      if (!onEdgeHover) return;
+      const graphEdge = dataRef.current.edges[edge.id];
+      if (!graphEdge) return;
+      hoverTargetRef.current = { kind: 'edge', id: edge.id };
+      const geometry = measureEdgeGeometry(edge.id, edgeHoverAnchor, graphSurfaceRef.current);
+      onEdgeHover(graphEdge, geometry);
     },
-    [onEdgeHover]
+    [onEdgeHover, edgeHoverAnchor]
   );
 
   const handleEdgeMouseLeave = useCallback(
     () => {
+      cancelScheduledHoverFlush();
+      hoverTargetRef.current = null;
       if (onEdgeHover) {
-        onEdgeHover(null);
+        onEdgeHover(null, null);
       }
     },
-    [onEdgeHover]
+    [onEdgeHover, cancelScheduledHoverFlush]
   );
 
   const minimapNodeColor = useCallback((node: Node) => {
@@ -230,42 +301,44 @@ function GraphViewInner({
   }
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={handleNodeClick}
-      onEdgeClick={handleEdgeClick}
-      onNodeMouseEnter={handleNodeMouseEnter}
-      onNodeMouseLeave={handleNodeMouseLeave}
-      onEdgeMouseEnter={handleEdgeMouseEnter}
-      onEdgeMouseLeave={handleEdgeMouseLeave}
-      onSelectionChange={handleSelectionChange}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={defaultEdgeOptions}
-      selectionOnDrag
-      selectionMode={SelectionMode.Partial}
-      selectNodesOnDrag
-      panOnDrag={panOnDrag}
-      panOnScroll
-      zoomOnScroll
-      multiSelectionKeyCode="Shift"
-      fitView
-      fitViewOptions={fitViewOptions}
-      className={`${styles.graphView} ${className || ''}`}
-      proOptions={proOptions}
-    >
-      <Background color="#ddd" gap={20} />
-      <Controls />
-      <MiniMap
-        nodeColor={minimapNodeColor}
-        nodeStrokeWidth={3}
-        zoomable
-        pannable
-      />
-    </ReactFlow>
+    <div ref={graphSurfaceRef} className={styles.graphSurface}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={handleNodeClick}
+        onEdgeClick={handleEdgeClick}
+        onNodeMouseEnter={handleNodeMouseEnter}
+        onNodeMouseLeave={handleNodeMouseLeave}
+        onEdgeMouseEnter={handleEdgeMouseEnter}
+        onEdgeMouseLeave={handleEdgeMouseLeave}
+        onSelectionChange={handleSelectionChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        selectNodesOnDrag
+        panOnDrag={panOnDrag}
+        panOnScroll
+        zoomOnScroll
+        multiSelectionKeyCode="Shift"
+        fitView
+        fitViewOptions={fitViewOptions}
+        className={`${styles.graphView} ${className || ''}`}
+        proOptions={proOptions}
+      >
+        <Background color="#ddd" gap={20} />
+        <Controls />
+        <MiniMap
+          nodeColor={minimapNodeColor}
+          nodeStrokeWidth={3}
+          zoomable
+          pannable
+        />
+      </ReactFlow>
+    </div>
   );
 }
 
