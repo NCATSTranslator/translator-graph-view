@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -16,7 +16,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import type { GraphViewProps, FlowNode, FlowEdge, GraphNodeData } from '../../types';
+import type { GraphViewProps, FlowNode, FlowEdge, GraphNodeData, GraphEdgeData } from '../../types';
 import { transformNodesToFlow, transformEdgesToFlow } from '../../utils';
 import { useGraphLayout } from '../../hooks/useGraphLayout';
 import { useSelection } from '../../hooks/useSelection';
@@ -34,8 +34,14 @@ const edgeTypes: EdgeTypes = {
 };
 
 const defaultEdgeOptions = {
-  type: 'graphEdge'
+  type: 'graphEdge',
 };
+
+const panOnDrag: number[] = [1, 2];
+
+const proOptions = { hideAttribution: true };
+
+const fitViewOptions = { padding: 0.1 };
 
 interface GraphViewInnerProps extends GraphViewProps {
   initialNodes: FlowNode[];
@@ -49,6 +55,10 @@ function GraphViewInner({
   onSelectionChange,
   onNodeClick,
   onEdgeClick,
+  onNodeHover,
+  onEdgeHover,
+  hoveredNodeId,
+  hoveredEdgeId,
   selectedIds,
   className,
   initialNodes,
@@ -63,8 +73,8 @@ function GraphViewInner({
     elkWorkerUrl,
   });
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
 
   const { handleSelectionChange } = useSelection({
     data,
@@ -85,46 +95,129 @@ function GraphViewInner({
   }, [layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView]);
 
   // Handle controlled selection
+  const prevSelectedIdsRef = useRef<string[] | undefined>(undefined);
+
   useEffect(() => {
-    if (selectedIds) {
-      const selectedSet = new Set(selectedIds);
-      setNodes((nds) =>
-        nds.map((node) => ({
-          ...node,
-          selected: selectedSet.has(node.id),
-        }))
-      );
-      setEdges((eds) =>
-        eds.map((edge) => ({
-          ...edge,
-          selected: selectedSet.has(edge.id),
-        }))
-      );
-    }
+    if (!selectedIds) return;
+    const prev = prevSelectedIdsRef.current;
+    if (prev && prev.length === selectedIds.length && prev.every((id, i) => id === selectedIds[i])) return;
+    prevSelectedIdsRef.current = selectedIds;
+
+    const selectedSet = new Set(selectedIds);
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        selected: selectedSet.has(node.id),
+      }))
+    );
+    setEdges((eds) =>
+      eds.map((edge) => ({
+        ...edge,
+        selected: selectedSet.has(edge.id),
+      }))
+    );
   }, [selectedIds, setNodes, setEdges]);
+
+  // Handle controlled hover — only touch the items whose hovered flag actually changes
+  const prevHoveredNodeIdRef = useRef<string | null | undefined>(undefined);
+  const prevHoveredEdgeIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const prev = prevHoveredNodeIdRef.current;
+    if (prev === hoveredNodeId) return;
+    prevHoveredNodeIdRef.current = hoveredNodeId;
+    setNodes((nds) =>
+      nds.map((node) => {
+        const shouldHover = node.id === hoveredNodeId;
+        const wasHovered = node.id === prev;
+        if (!shouldHover && !wasHovered) return node;
+        return { ...node, data: { ...node.data, hovered: shouldHover } as GraphNodeData };
+      })
+    );
+  }, [hoveredNodeId, setNodes]);
+
+  useEffect(() => {
+    const prev = prevHoveredEdgeIdRef.current;
+    if (prev === hoveredEdgeId) return;
+    prevHoveredEdgeIdRef.current = hoveredEdgeId;
+    setEdges((eds) =>
+      eds.map((edge) => {
+        const shouldHover = edge.id === hoveredEdgeId;
+        const wasHovered = edge.id === prev;
+        if (!shouldHover && !wasHovered) return edge;
+        return { ...edge, data: { ...edge.data, hovered: shouldHover } as GraphEdgeData };
+      })
+    );
+  }, [hoveredEdgeId, setEdges]);
+
+  // Stable ref for data so event callbacks don't rebind on every data change
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       if (onNodeClick) {
-        const graphNode = data.nodes[node.id];
+        const graphNode = dataRef.current.nodes[node.id];
         if (graphNode) {
           onNodeClick(graphNode);
         }
       }
     },
-    [data, onNodeClick]
+    [onNodeClick]
   );
 
   const handleEdgeClick = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
       if (onEdgeClick) {
-        const graphEdge = data.edges[edge.id];
+        const graphEdge = dataRef.current.edges[edge.id];
         if (graphEdge) {
           onEdgeClick(graphEdge);
         }
       }
     },
-    [data, onEdgeClick]
+    [onEdgeClick]
+  );
+
+  const handleNodeMouseEnter = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (onNodeHover) {
+        const graphNode = dataRef.current.nodes[node.id];
+        if (graphNode) {
+          onNodeHover(graphNode);
+        }
+      }
+    },
+    [onNodeHover]
+  );
+
+  const handleNodeMouseLeave = useCallback(
+    () => {
+      if (onNodeHover) {
+        onNodeHover(null);
+      }
+    },
+    [onNodeHover]
+  );
+
+  const handleEdgeMouseEnter = useCallback(
+    (_event: React.MouseEvent, edge: Edge) => {
+      if (onEdgeHover) {
+        const graphEdge = dataRef.current.edges[edge.id];
+        if (graphEdge) {
+          onEdgeHover(graphEdge);
+        }
+      }
+    },
+    [onEdgeHover]
+  );
+
+  const handleEdgeMouseLeave = useCallback(
+    () => {
+      if (onEdgeHover) {
+        onEdgeHover(null);
+      }
+    },
+    [onEdgeHover]
   );
 
   const minimapNodeColor = useCallback((node: Node) => {
@@ -144,6 +237,10 @@ function GraphViewInner({
       onEdgesChange={onEdgesChange}
       onNodeClick={handleNodeClick}
       onEdgeClick={handleEdgeClick}
+      onNodeMouseEnter={handleNodeMouseEnter}
+      onNodeMouseLeave={handleNodeMouseLeave}
+      onEdgeMouseEnter={handleEdgeMouseEnter}
+      onEdgeMouseLeave={handleEdgeMouseLeave}
       onSelectionChange={handleSelectionChange}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
@@ -151,14 +248,14 @@ function GraphViewInner({
       selectionOnDrag
       selectionMode={SelectionMode.Partial}
       selectNodesOnDrag
-      panOnDrag={[1, 2]}
+      panOnDrag={panOnDrag}
       panOnScroll
       zoomOnScroll
       multiSelectionKeyCode="Shift"
       fitView
-      fitViewOptions={{ padding: 0.1 }}
+      fitViewOptions={fitViewOptions}
       className={`${styles.graphView} ${className || ''}`}
-      proOptions={{hideAttribution: true }}
+      proOptions={proOptions}
     >
       <Background color="#ddd" gap={20} />
       <Controls />
@@ -175,7 +272,10 @@ function GraphViewInner({
 export function GraphView(props: GraphViewProps) {
   const { data, edgeType, showEdgeLabels = true, multiEdgeSpacing } = props;
 
-  const initialNodes = useMemo(() => transformNodesToFlow(data), [data]);
+  const initialNodes = useMemo(
+    () => transformNodesToFlow(data),
+    [data],
+  );
   const initialEdges = useMemo(
     () => transformEdgesToFlow(data, edgeType, showEdgeLabels),
     [data, edgeType, showEdgeLabels],
