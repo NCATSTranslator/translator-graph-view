@@ -59,6 +59,61 @@ function toRect(domRect: DOMRect): { x: number; y: number; width: number; height
 }
 
 /**
+ * Sample points along an SVG path and return the visible point closest to the
+ * viewport center. Falls back to the true geometric midpoint when no sampled
+ * point is inside the viewport.
+ */
+function visibleMidpoint(
+  pathEl: SVGPathElement,
+): { x: number; y: number } | null {
+  const totalLength = pathEl.getTotalLength();
+  if (totalLength === 0) return null;
+
+  const ctm = pathEl.getScreenCTM();
+  if (!ctm) return null;
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const vcx = vw / 2;
+  const vcy = vh / 2;
+
+  const SAMPLES = 20;
+
+  let bestPt: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+
+  // Also keep the true midpoint (sample at 50%) as fallback
+  let midpointPt: { x: number; y: number } | null = null;
+
+  for (let i = 0; i <= SAMPLES; i++) {
+    const svgPt = pathEl.getPointAtLength((i / SAMPLES) * totalLength);
+    const vpPt = {
+      x: ctm.a * svgPt.x + ctm.c * svgPt.y + ctm.e,
+      y: ctm.b * svgPt.x + ctm.d * svgPt.y + ctm.f,
+    };
+
+    // Capture the true midpoint (i === SAMPLES / 2 === 10)
+    if (i === SAMPLES / 2) {
+      midpointPt = vpPt;
+    }
+
+    // Check if point is inside the viewport
+    if (vpPt.x >= 0 && vpPt.x <= vw && vpPt.y >= 0 && vpPt.y <= vh) {
+      const dx = vpPt.x - vcx;
+      const dy = vpPt.y - vcy;
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPt = vpPt;
+      }
+    }
+  }
+
+  // Return the best visible point, or fall back to the true midpoint
+  return bestPt ?? midpointPt;
+}
+
+/**
  * Measure hover geometry for a node element.
  * Nodes are HTML elements with data-id matching the node ID.
  * @param root Search root (e.g. the GraphView wrapper); avoids matching another React Flow on the page.
@@ -109,22 +164,10 @@ export function measureEdgeGeometry(
   const rect = toRect(pathEl.getBoundingClientRect());
 
   if (anchor === 'midpoint') {
-    const totalLength = pathEl.getTotalLength();
-    if (totalLength === 0) {
+    const anchorPt = visibleMidpoint(pathEl);
+    if (!anchorPt) {
       return { rect, anchor: anchorFromRect(rect, 'center'), anchorPosition: 'midpoint' };
     }
-
-    const svgPoint = pathEl.getPointAtLength(totalLength / 2);
-    const ctm = pathEl.getScreenCTM();
-    if (!ctm) {
-      return { rect, anchor: anchorFromRect(rect, 'center'), anchorPosition: 'midpoint' };
-    }
-
-    // Transform SVG-local point to viewport coordinates
-    const anchorPt = {
-      x: ctm.a * svgPoint.x + ctm.c * svgPoint.y + ctm.e,
-      y: ctm.b * svgPoint.x + ctm.d * svgPoint.y + ctm.f,
-    };
     return { rect, anchor: anchorPt, anchorPosition: 'midpoint' };
   }
 
