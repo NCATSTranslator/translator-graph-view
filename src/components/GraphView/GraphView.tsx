@@ -326,6 +326,8 @@ function GraphViewInner({
         multiSelectionKeyCode="Shift"
         fitView
         fitViewOptions={fitViewOptions}
+        minZoom={0.15}
+        maxZoom={3}
         className={`${styles.graphView} ${className || ''}`}
         proOptions={proOptions}
       >
