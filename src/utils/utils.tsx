@@ -19,50 +19,26 @@ import DefaultIcon from "../assets/icons/Default.svg?react";
  * @param {string} type - The type of the node.
  * @returns {ReactNode} - The icon for the node type.
  */
+const NODE_TYPE_ICONS: Record<string, ReactNode> = {
+  AnatomicalEntity: <AnatomicalEntityIcon />,
+  BiologicalEntity: <BiologicalEntityIcon />,
+  ChemicalEntity: <ChemicalEntityIcon />,
+  ChemicalMixture: <ChemicalEntityIcon />,
+  DiseaseOrPhenotypicFeature: <DiseaseIcon />,
+  Disease: <DiseaseIcon />,
+  Drug: <DrugIcon />,
+  Gene: <GeneIcon />,
+  Protein: <GeneIcon />,
+  PathologicalProcess: <PathologicalProcessIcon />,
+  PhenotypicFeature: <PhenotypicFeatureIcon />,
+  PhysiologicalProcess: <PhysiologicalProcessIcon />,
+  Polypeptide: <PolypeptideIcon />,
+  SmallMolecule: <SmallMoleculeIcon />,
+};
+
 export function getNodeTypeIcon(type: string): ReactNode {
-  if (type.startsWith('biolink:')) {
-    type = type.replace('biolink:', '');
-  }
-  switch (type) {
-    case 'AnatomicalEntity':
-      return <AnatomicalEntityIcon />;
-
-    case 'BiologicalEntity':
-      return <BiologicalEntityIcon />;
-
-    case 'ChemicalEntity':
-    case 'ChemicalMixture':
-      return <ChemicalEntityIcon />;
-
-    case 'DiseaseOrPhenotypicFeature':
-    case 'Disease':
-      return <DiseaseIcon />;
-
-    case 'Drug':
-      return <DrugIcon />;
-
-    case 'Gene':
-    case 'Protein':
-      return <GeneIcon />;
-
-    case 'PathologicalProcess':
-      return <PathologicalProcessIcon />;
-
-    case 'PhenotypicFeature':
-      return <PhenotypicFeatureIcon />;
-
-    case 'PhysiologicalProcess':
-      return <PhysiologicalProcessIcon />;
-
-    case 'Polypeptide':
-      return <PolypeptideIcon />;
-
-    case 'SmallMolecule':
-      return <SmallMoleculeIcon />;
-
-    default:   
-      return <DefaultIcon />;
-  }
+  const key = type.startsWith('biolink:') ? type.slice('biolink:'.length) : type;
+  return NODE_TYPE_ICONS[key] ?? <DefaultIcon />;
 }
 
 /**
@@ -81,9 +57,11 @@ export function capitalizeWord(word: string): string {
  * @param {string} word - The word to check.
  * @returns {boolean} - True if the word is a Roman numeral, otherwise false.
  */
+const ROMAN_NUMERAL_PATTERN = /^M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})$/i;
+
 function isRomanNumeral(word: string): boolean {
-  const romanNumeralPattern = /^(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})$/i;
-  return romanNumeralPattern.test(word);
+  if (word.length === 0) return false;
+  return ROMAN_NUMERAL_PATTERN.test(word);
 }
 
 /**

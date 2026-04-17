@@ -63,6 +63,38 @@ function toRect(domRect: DOMRect): { x: number; y: number; width: number; height
  * segment. Falls back to the path's geometric midpoint when no sampled
  * point is inside the viewport.
  */
+function pointAtLengthInViewport(
+  pathEl: SVGPathElement,
+  ctm: DOMMatrix,
+  length: number,
+): { x: number; y: number } {
+  const p = pathEl.getPointAtLength(length);
+  return {
+    x: ctm.a * p.x + ctm.c * p.y + ctm.e,
+    y: ctm.b * p.x + ctm.d * p.y + ctm.f,
+  };
+}
+
+function findVisibleSampleRange(
+  pathEl: SVGPathElement,
+  ctm: DOMMatrix,
+  totalLength: number,
+  samples: number,
+): { first: number; last: number } {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i <= samples; i++) {
+    const pt = pointAtLengthInViewport(pathEl, ctm, (i / samples) * totalLength);
+    if (pt.x >= 0 && pt.x <= vw && pt.y >= 0 && pt.y <= vh) {
+      if (first === -1) first = i;
+      last = i;
+    }
+  }
+  return { first, last };
+}
+
 function visibleMidpoint(
   pathEl: SVGPathElement,
 ): { x: number; y: number } | null {
@@ -72,44 +104,16 @@ function visibleMidpoint(
   const ctm = pathEl.getScreenCTM();
   if (!ctm) return null;
 
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
   const SAMPLES = 20;
+  const { first, last } = findVisibleSampleRange(pathEl, ctm, totalLength, SAMPLES);
 
-  // Find the first and last visible sample indices along the path
-  let firstVisible = -1;
-  let lastVisible = -1;
-
-  for (let i = 0; i <= SAMPLES; i++) {
-    const svgPt = pathEl.getPointAtLength((i / SAMPLES) * totalLength);
-    const vpPt = {
-      x: ctm.a * svgPt.x + ctm.c * svgPt.y + ctm.e,
-      y: ctm.b * svgPt.x + ctm.d * svgPt.y + ctm.f,
-    };
-
-    if (vpPt.x >= 0 && vpPt.x <= vw && vpPt.y >= 0 && vpPt.y <= vh) {
-      if (firstVisible === -1) firstVisible = i;
-      lastVisible = i;
-    }
-  }
-
-  // Compute the point at the center of the visible segment
-  if (firstVisible !== -1) {
-    const midIndex = (firstVisible + lastVisible) / 2;
-    const svgPt = pathEl.getPointAtLength((midIndex / SAMPLES) * totalLength);
-    return {
-      x: ctm.a * svgPt.x + ctm.c * svgPt.y + ctm.e,
-      y: ctm.b * svgPt.x + ctm.d * svgPt.y + ctm.f,
-    };
+  if (first !== -1) {
+    const midIndex = (first + last) / 2;
+    return pointAtLengthInViewport(pathEl, ctm, (midIndex / SAMPLES) * totalLength);
   }
 
   // Entire edge off-screen — fall back to geometric midpoint
-  const midSvg = pathEl.getPointAtLength(totalLength / 2);
-  return {
-    x: ctm.a * midSvg.x + ctm.c * midSvg.y + ctm.e,
-    y: ctm.b * midSvg.x + ctm.d * midSvg.y + ctm.f,
-  };
+  return pointAtLengthInViewport(pathEl, ctm, totalLength / 2);
 }
 
 /**

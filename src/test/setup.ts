@@ -14,12 +14,11 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 if (typeof globalThis.DOMMatrixReadOnly === 'undefined') {
   class DOMMatrixReadOnlyMock {
     m22 = 1;
-    constructor(_init?: string | number[]) {}
   }
   // @ts-expect-error — minimal polyfill for xyflow
   globalThis.DOMMatrixReadOnly = DOMMatrixReadOnlyMock;
 }
 
-if (!Element.prototype.hasOwnProperty('scrollTo')) {
+if (!Object.prototype.hasOwnProperty.call(Element.prototype, 'scrollTo')) {
   Element.prototype.scrollTo = () => {};
 }

@@ -29,6 +29,36 @@ function toElkLayoutOptions(options: ReturnType<typeof getLayoutOptions>): Layou
   return result;
 }
 
+function buildElkGraph(nodes: FlowNode[], edges: FlowEdge[], layout: LayoutType): ElkNode {
+  const elkNodes: ElkNode[] = nodes.map((node) => ({
+    id: node.id,
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
+  }));
+  const elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
+    id: edge.id,
+    sources: [edge.source],
+    targets: [edge.target],
+  }));
+  return {
+    id: 'root',
+    layoutOptions: toElkLayoutOptions(getLayoutOptions(layout)),
+    children: elkNodes,
+    edges: elkEdges,
+  };
+}
+
+function applyElkPositions(nodes: FlowNode[], layoutedGraph: ElkNode): FlowNode[] {
+  const positionMap = new Map<string, { x: number; y: number }>();
+  for (const child of layoutedGraph.children ?? []) {
+    positionMap.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
+  }
+  return nodes.map((node) => ({
+    ...node,
+    position: positionMap.get(node.id) ?? { x: 0, y: 0 },
+  }));
+}
+
 export function useGraphLayout({
   nodes,
   edges,
@@ -51,47 +81,10 @@ export function useGraphLayout({
     setIsLayouting(true);
 
     try {
-      const elkNodes: ElkNode[] = nodes.map((node) => ({
-        id: node.id,
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-      }));
-
-      const elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
-        id: edge.id,
-        sources: [edge.source],
-        targets: [edge.target],
-      }));
-
-      const elkGraph: ElkNode = {
-        id: 'root',
-        layoutOptions: toElkLayoutOptions(getLayoutOptions(layout)),
-        children: elkNodes,
-        edges: elkEdges,
-      };
-
-      const layoutedGraph = await elk.layout(elkGraph);
-
+      const layoutedGraph = await elk.layout(buildElkGraph(nodes, edges, layout));
       if (cancelled()) return;
-
       if (layoutedGraph.children) {
-        const positionMap = new Map<string, { x: number; y: number }>();
-        for (const child of layoutedGraph.children) {
-          positionMap.set(child.id, {
-            x: child.x ?? 0,
-            y: child.y ?? 0,
-          });
-        }
-
-        const newNodes = nodes.map((node) => {
-          const position = positionMap.get(node.id) ?? { x: 0, y: 0 };
-          return {
-            ...node,
-            position,
-          };
-        });
-
-        setLayoutedNodes(newNodes);
+        setLayoutedNodes(applyElkPositions(nodes, layoutedGraph));
         setLayoutedEdges(edges);
       }
     } catch (error) {
