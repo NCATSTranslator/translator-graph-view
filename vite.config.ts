@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, type CSSOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
@@ -12,6 +13,14 @@ const cssConfig: CSSOptions = {
   },
 };
 
+const testConfig = {
+  globals: true,
+  environment: 'jsdom',
+  setupFiles: ['./src/test/setup.ts'],
+  css: true,
+  exclude: ['node_modules', 'dist', 'e2e'],
+} as const;
+
 export default defineConfig(({ mode }) => {
   if (mode === 'development') {
     return {
@@ -24,6 +33,7 @@ export default defineConfig(({ mode }) => {
           '@': resolve(__dirname, 'src'),
         },
       },
+      test: testConfig,
     };
   }
 
@@ -66,5 +76,6 @@ export default defineConfig(({ mode }) => {
       },
       cssCodeSplit: false,
     },
+    test: testConfig,
   };
 });

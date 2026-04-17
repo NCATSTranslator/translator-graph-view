@@ -40,9 +40,8 @@ const colorCache = new Map<string, string>();
  * @returns A hex color string
  */
 export function getColorForType(type: string): string {
-  if (colorCache.has(type)) {
-    return colorCache.get(type)!;
-  }
+  const cached = colorCache.get(type);
+  if (cached !== undefined) return cached;
 
   const hash = hashString(type);
   const color = COLOR_PALETTE[hash % COLOR_PALETTE.length];

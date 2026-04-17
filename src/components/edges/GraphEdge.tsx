@@ -41,15 +41,19 @@ function getEdgePath(
  * perpendicular to the straight line between source and target.
  * Returns [pathString, labelX, labelY].
  */
-function getMultiEdgePath(
-  sx: number,
-  sy: number,
-  tx: number,
-  ty: number,
-  edgeIndex: number,
-  edgeTotalCount: number,
-  spacing: number,
-): [string, number, number] {
+interface MultiEdgeParams {
+  sx: number;
+  sy: number;
+  tx: number;
+  ty: number;
+  edgeIndex: number;
+  edgeTotalCount: number;
+  spacing: number;
+}
+
+function getMultiEdgePath({
+  sx, sy, tx, ty, edgeIndex, edgeTotalCount, spacing,
+}: MultiEdgeParams): [string, number, number] {
   const offset = (edgeIndex - (edgeTotalCount - 1) / 2) * spacing;
 
   const dx = tx - sx;
@@ -73,6 +77,51 @@ function getMultiEdgePath(
 
 const EDGE_Y_OFFSET = NODE_HEIGHT / 2;
 
+interface ResolvedEdgeProps {
+  edgeType: EdgeType;
+  inferred: boolean;
+  edgeIndex?: number;
+  edgeTotalCount?: number;
+  label: string;
+  hovered: boolean;
+  predicate?: string;
+}
+
+function resolveEdgeDataProps(data: GraphEdgeData | undefined): ResolvedEdgeProps {
+  const {
+    edgeType = 'straight',
+    inferred = false,
+    edgeIndex,
+    edgeTotalCount,
+    showLabel = true,
+    label: rawLabel = '',
+    hovered = false,
+    graphEdge,
+  } = data ?? {};
+  return {
+    edgeType,
+    inferred,
+    edgeIndex,
+    edgeTotalCount,
+    label: showLabel ? rawLabel : '',
+    hovered,
+    predicate: graphEdge?.predicate,
+  };
+}
+
+function buildEdgePathClassName(
+  styles: Record<string, string>,
+  selected: boolean,
+  inferred: boolean,
+  hovered: boolean,
+): string {
+  const classes = [styles.edgePath];
+  if (selected) classes.push(styles.selected);
+  if (inferred) classes.push(styles.inferred);
+  if (hovered) classes.push(styles.hovered);
+  return classes.join(' ');
+}
+
 function GraphEdgeComponent({
   id,
   sourceX,
@@ -87,23 +136,22 @@ function GraphEdgeComponent({
 }: EdgeProps) {
   const { multiEdgeSpacing } = useGraphSettings();
   const edgeData = data as GraphEdgeData | undefined;
-  const edgeType: EdgeType = edgeData?.edgeType ?? 'straight';
-  const inferred = edgeData?.inferred ?? false;
-  const edgeIndex = edgeData?.edgeIndex;
-  const edgeTotalCount = edgeData?.edgeTotalCount;
-  const isMultiEdge = edgeTotalCount != null && edgeTotalCount > 1 && edgeIndex != null;
+  const {
+    edgeType, inferred, edgeIndex, edgeTotalCount,
+    label, hovered, predicate,
+  } = resolveEdgeDataProps(edgeData);
 
   const [edgePath, labelX, labelY] = useMemo(() => {
     const adjSourceY = sourceY - EDGE_Y_OFFSET;
     const adjTargetY = targetY + EDGE_Y_OFFSET;
 
-    if (isMultiEdge) {
-      return getMultiEdgePath(
-        sourceX, adjSourceY,
-        targetX, adjTargetY,
+    if (edgeIndex !== undefined && edgeTotalCount !== undefined && edgeTotalCount > 1) {
+      return getMultiEdgePath({
+        sx: sourceX, sy: adjSourceY,
+        tx: targetX, ty: adjTargetY,
         edgeIndex, edgeTotalCount,
-        multiEdgeSpacing,
-      );
+        spacing: multiEdgeSpacing,
+      });
     }
     return getEdgePath(edgeType, {
       sourceX,
@@ -114,22 +162,12 @@ function GraphEdgeComponent({
       targetPosition,
     });
   }, [
-    isMultiEdge, edgeIndex, edgeTotalCount, multiEdgeSpacing,
+    edgeIndex, edgeTotalCount, multiEdgeSpacing,
     edgeType, sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
   ]);
 
-  const showLabel = edgeData?.showLabel ?? true;
-  const label = showLabel ? edgeData?.label || '' : '';
-
-  const hovered = edgeData?.hovered ?? false;
-
-  const pathClassName = [
-    styles.edgePath,
-    selected ? styles.selected : '',
-    inferred ? styles.inferred : '',
-    hovered ? styles.hovered : '',
-  ].filter(Boolean).join(' ');
+  const pathClassName = buildEdgePathClassName(styles, !!selected, inferred, hovered);
 
   return (
     <>
@@ -142,6 +180,7 @@ function GraphEdgeComponent({
       {label && (
         <EdgeLabelRenderer>
           <div
+            // eslint-disable-next-line no-restricted-syntax
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
@@ -149,7 +188,7 @@ function GraphEdgeComponent({
           >
             <div
               className={`${styles.edgeLabel} ${selected ? styles.selected : ''}`}
-              title={edgeData?.graphEdge?.predicate}
+              title={predicate}
             >
               {label}
             </div>

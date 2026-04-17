@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -17,14 +17,19 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import type { GraphViewProps, FlowNode, FlowEdge, GraphNodeData, GraphEdgeData } from '../../types';
+import type { GraphViewProps, FlowNode, FlowEdge, GraphNodeData } from '../../types';
 import { transformNodesToFlow, transformEdgesToFlow } from '../../utils';
-import { measureNodeGeometry, measureEdgeGeometry } from '../../utils/hoverGeometry';
 import { useGraphLayout } from '../../hooks/useGraphLayout';
 import { useSelection } from '../../hooks/useSelection';
 import { GraphSettingsContext, type GraphSettings } from '../../hooks/useGraphSettings';
 import { GraphNode } from '../nodes';
 import { GraphEdge } from '../edges';
+import {
+  useLayoutSync,
+  useControlledSelection,
+  useControlledHover,
+  useHoverGeometry,
+} from './hooks';
 import styles from './GraphView.module.scss';
 
 const nodeTypes: NodeTypes = {
@@ -85,210 +90,48 @@ function GraphViewInner({
     onSelectionChange,
   });
 
-  // Update nodes and edges when layout changes
-  useEffect(() => {
-    if (!isLayouting && layoutedNodes.length > 0) {
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
-      // Fit view after layout
-      const timer = setTimeout(() => {
-        fitView({ padding: 0.1, duration: 200 });
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView]);
+  useLayoutSync({ layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView });
+  useControlledSelection(selectedIds, setNodes, setEdges);
+  useControlledHover(hoveredNodeId, hoveredEdgeId, setNodes, setEdges);
 
-  // Handle controlled selection
-  const prevSelectedIdsRef = useRef<string[] | undefined>(undefined);
-
-  useEffect(() => {
-    if (!selectedIds) return;
-    const prev = prevSelectedIdsRef.current;
-    if (prev && prev.length === selectedIds.length && prev.every((id, i) => id === selectedIds[i])) return;
-    prevSelectedIdsRef.current = selectedIds;
-
-    const selectedSet = new Set(selectedIds);
-    setNodes((nds) =>
-      nds.map((node) => ({
-        ...node,
-        selected: selectedSet.has(node.id),
-      }))
-    );
-    setEdges((eds) =>
-      eds.map((edge) => ({
-        ...edge,
-        selected: selectedSet.has(edge.id),
-      }))
-    );
-  }, [selectedIds, setNodes, setEdges]);
-
-  // Handle controlled hover — only touch the items whose hovered flag actually changes
-  const prevHoveredNodeIdRef = useRef<string | null | undefined>(undefined);
-  const prevHoveredEdgeIdRef = useRef<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    const prev = prevHoveredNodeIdRef.current;
-    if (prev === hoveredNodeId) return;
-    prevHoveredNodeIdRef.current = hoveredNodeId;
-    setNodes((nds) =>
-      nds.map((node) => {
-        const shouldHover = node.id === hoveredNodeId;
-        const wasHovered = node.id === prev;
-        if (!shouldHover && !wasHovered) return node;
-        return { ...node, data: { ...node.data, hovered: shouldHover } as GraphNodeData };
-      })
-    );
-  }, [hoveredNodeId, setNodes]);
-
-  useEffect(() => {
-    const prev = prevHoveredEdgeIdRef.current;
-    if (prev === hoveredEdgeId) return;
-    prevHoveredEdgeIdRef.current = hoveredEdgeId;
-    setEdges((eds) =>
-      eds.map((edge) => {
-        const shouldHover = edge.id === hoveredEdgeId;
-        const wasHovered = edge.id === prev;
-        if (!shouldHover && !wasHovered) return edge;
-        return { ...edge, data: { ...edge.data, hovered: shouldHover } as GraphEdgeData };
-      })
-    );
-  }, [hoveredEdgeId, setEdges]);
-
-  // Stable ref for data so event callbacks don't rebind on every data change
   const dataRef = useRef(data);
   dataRef.current = data;
 
   const graphSurfaceRef = useRef<HTMLDivElement>(null);
-  const hoverTargetRef = useRef<
-    | { kind: 'node'; id: string }
-    | { kind: 'edge'; id: string }
-    | null
-  >(null);
-  const onNodeHoverRef = useRef(onNodeHover);
-  onNodeHoverRef.current = onNodeHover;
-  const onEdgeHoverRef = useRef(onEdgeHover);
-  onEdgeHoverRef.current = onEdgeHover;
-  const nodeHoverAnchorRef = useRef(nodeHoverAnchor);
-  nodeHoverAnchorRef.current = nodeHoverAnchor;
-  const edgeHoverAnchorRef = useRef(edgeHoverAnchor);
-  edgeHoverAnchorRef.current = edgeHoverAnchor;
-  const rafHoverFlushRef = useRef<number | null>(null);
 
-  const cancelScheduledHoverFlush = useCallback(() => {
-    if (rafHoverFlushRef.current != null) {
-      cancelAnimationFrame(rafHoverFlushRef.current);
-      rafHoverFlushRef.current = null;
-    }
-  }, []);
-
-  const flushHoverGeometry = useCallback(() => {
-    const root = graphSurfaceRef.current;
-    const target = hoverTargetRef.current;
-    if (!root || !target) return;
-
-    if (target.kind === 'node') {
-      const cb = onNodeHoverRef.current;
-      if (!cb) return;
-      const graphNode = dataRef.current.nodes[target.id];
-      if (!graphNode) return;
-      const geometry = measureNodeGeometry(target.id, nodeHoverAnchorRef.current, root);
-      cb(graphNode, geometry);
-    } else {
-      const cb = onEdgeHoverRef.current;
-      if (!cb) return;
-      const graphEdge = dataRef.current.edges[target.id];
-      if (!graphEdge) return;
-      const geometry = measureEdgeGeometry(target.id, edgeHoverAnchorRef.current, root);
-      cb(graphEdge, geometry);
-    }
-  }, []);
-
-  const scheduleHoverGeometryFlush = useCallback(() => {
-    if (!hoverTargetRef.current) return;
-    if (rafHoverFlushRef.current != null) return;
-    rafHoverFlushRef.current = requestAnimationFrame(() => {
-      rafHoverFlushRef.current = null;
-      flushHoverGeometry();
-    });
-  }, [flushHoverGeometry]);
-
-  useOnViewportChange({
-    onChange: scheduleHoverGeometryFlush,
-    onEnd: scheduleHoverGeometryFlush,
+  const {
+    handleNodeMouseEnter,
+    handleNodeMouseLeave,
+    handleEdgeMouseEnter,
+    handleEdgeMouseLeave,
+    scheduleFlush,
+  } = useHoverGeometry({
+    data,
+    nodeHoverAnchor,
+    edgeHoverAnchor,
+    onNodeHover,
+    onEdgeHover,
+    surfaceRef: graphSurfaceRef,
   });
 
-  useEffect(() => () => {
-    cancelScheduledHoverFlush();
-  }, [cancelScheduledHoverFlush]);
+  useOnViewportChange({ onChange: scheduleFlush, onEnd: scheduleFlush });
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      if (onNodeClick) {
-        const graphNode = dataRef.current.nodes[node.id];
-        if (graphNode) {
-          onNodeClick(graphNode);
-        }
-      }
+      if (!onNodeClick) return;
+      const graphNode = dataRef.current.nodes[node.id];
+      if (graphNode) onNodeClick(graphNode);
     },
-    [onNodeClick]
+    [onNodeClick],
   );
 
   const handleEdgeClick = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
-      if (onEdgeClick) {
-        const graphEdge = dataRef.current.edges[edge.id];
-        if (graphEdge) {
-          onEdgeClick(graphEdge);
-        }
-      }
-    },
-    [onEdgeClick]
-  );
-
-  const handleNodeMouseEnter = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (!onNodeHover) return;
-      const graphNode = dataRef.current.nodes[node.id];
-      if (!graphNode) return;
-      hoverTargetRef.current = { kind: 'node', id: node.id };
-      const geometry = measureNodeGeometry(node.id, nodeHoverAnchor, graphSurfaceRef.current);
-      onNodeHover(graphNode, geometry);
-    },
-    [onNodeHover, nodeHoverAnchor]
-  );
-
-  const handleNodeMouseLeave = useCallback(
-    () => {
-      cancelScheduledHoverFlush();
-      hoverTargetRef.current = null;
-      if (onNodeHover) {
-        onNodeHover(null, null);
-      }
-    },
-    [onNodeHover, cancelScheduledHoverFlush]
-  );
-
-  const handleEdgeMouseEnter = useCallback(
-    (_event: React.MouseEvent, edge: Edge) => {
-      if (!onEdgeHover) return;
+      if (!onEdgeClick) return;
       const graphEdge = dataRef.current.edges[edge.id];
-      if (!graphEdge) return;
-      hoverTargetRef.current = { kind: 'edge', id: edge.id };
-      const geometry = measureEdgeGeometry(edge.id, edgeHoverAnchor, graphSurfaceRef.current);
-      onEdgeHover(graphEdge, geometry);
+      if (graphEdge) onEdgeClick(graphEdge);
     },
-    [onEdgeHover, edgeHoverAnchor]
-  );
-
-  const handleEdgeMouseLeave = useCallback(
-    () => {
-      cancelScheduledHoverFlush();
-      hoverTargetRef.current = null;
-      if (onEdgeHover) {
-        onEdgeHover(null, null);
-      }
-    },
-    [onEdgeHover, cancelScheduledHoverFlush]
+    [onEdgeClick],
   );
 
   const minimapNodeColor = useCallback((node: Node) => {
