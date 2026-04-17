@@ -3,3 +3,9 @@ dist
 .DS_Store
 *.local
 *.log
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
