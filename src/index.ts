@@ -2,6 +2,7 @@
 export { GraphView } from './components/GraphView';
 export { GraphNode } from './components/nodes';
 export { GraphEdge } from './components/edges';
+export { GraphAnnotationNode } from './components/annotations';
 
 // Hooks
 export { useGraphLayout } from './hooks/useGraphLayout';
@@ -24,6 +25,9 @@ export {
   getEdgesById,
   NODE_WIDTH,
   NODE_HEIGHT,
+  transformAnnotationsToFlow,
+  extractAnnotationsFromFlow,
+  isAnnotationNode,
 } from './utils';
 
 // Types
@@ -42,8 +46,14 @@ export type {
   Provenance,
   GraphNodeData,
   GraphEdgeData,
+  GraphAnnotationData,
   FlowNode,
+  FlowGraphNode,
+  FlowAnnotationNode,
   FlowEdge,
   HoverAnchorPosition,
   HoverGeometry,
+  GraphFocusRequest,
+  GraphAnnotation,
+  GraphAnnotationStyles,
 } from './types';
