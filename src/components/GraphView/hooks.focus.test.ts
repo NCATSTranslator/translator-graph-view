@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { GraphFocusRequest } from '../../types';
-import { useFocusNode } from './hooks';
+import { FOCUS_MAX_ATTEMPTS, useFocusNode } from './hooks';
 
 const fitView = vi.fn();
 const getNode = vi.fn();
@@ -14,6 +14,14 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   };
 });
 
+async function flushAnimationFrames(count: number): Promise<void> {
+  for (let i = 0; i < count; i += 1) {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
+}
+
 describe('useFocusNode', () => {
   beforeEach(() => {
     fitView.mockReset();
@@ -22,13 +30,15 @@ describe('useFocusNode', () => {
   });
 
   it('calls fitView when focusRequest token changes', () => {
+    const consumedTokenRef = { current: undefined as number | undefined };
+
     const { rerender } = renderHook(
-      (props: { focusRequest: GraphFocusRequest | null; isLayouting: boolean }) =>
-        useFocusNode(props.focusRequest, props.isLayouting),
-      { initialProps: { focusRequest: null as GraphFocusRequest | null, isLayouting: false } },
+      (props: { focusRequest: GraphFocusRequest | null }) =>
+        useFocusNode(props.focusRequest, consumedTokenRef),
+      { initialProps: { focusRequest: null as GraphFocusRequest | null } },
     );
 
-    rerender({ focusRequest: { nodeId: 'a', token: 1 }, isLayouting: false });
+    rerender({ focusRequest: { nodeId: 'a', token: 1 } });
 
     expect(getNode).toHaveBeenCalledWith('a');
     expect(fitView).toHaveBeenCalledWith({
@@ -37,39 +47,36 @@ describe('useFocusNode', () => {
       maxZoom: 1.2,
       nodes: [{ id: 'a' }],
     });
+    expect(consumedTokenRef.current).toBe(1);
 
-    rerender({ focusRequest: { nodeId: 'a', token: 2 }, isLayouting: false });
+    rerender({ focusRequest: { nodeId: 'a', token: 2 } });
     expect(fitView).toHaveBeenCalledTimes(2);
   });
 
-  it('skips fitView while layouting or when node is missing', () => {
+  it('does not call fitView when the token was already consumed', () => {
     getNode.mockReturnValue(undefined);
+    const consumedTokenRef = { current: 1 as number | undefined };
 
-    const { rerender } = renderHook(
-      (props: { focusRequest: GraphFocusRequest | null; isLayouting: boolean }) =>
-        useFocusNode(props.focusRequest, props.isLayouting),
-      { initialProps: { focusRequest: { nodeId: 'missing', token: 1 }, isLayouting: true } },
-    );
+    renderHook(() => useFocusNode({ nodeId: 'missing', token: 1 }, consumedTokenRef));
 
-    expect(fitView).not.toHaveBeenCalled();
-
-    rerender({ focusRequest: { nodeId: 'missing', token: 1 }, isLayouting: false });
     expect(fitView).not.toHaveBeenCalled();
   });
 
-  it('retries focus when the node appears after the initial request', () => {
-    getNode.mockReturnValue(undefined);
+  it('retries focus when the node appears after the initial request', async () => {
+    let callCount = 0;
+    getNode.mockImplementation(() => {
+      callCount += 1;
+      return callCount >= 2 ? { id: 'a' } : undefined;
+    });
+    const consumedTokenRef = { current: undefined as number | undefined };
 
-    const { rerender } = renderHook(
-      (props: { focusRequest: GraphFocusRequest | null; isLayouting: boolean }) =>
-        useFocusNode(props.focusRequest, props.isLayouting),
-      { initialProps: { focusRequest: { nodeId: 'a', token: 1 }, isLayouting: false } },
-    );
+    renderHook(() => useFocusNode({ nodeId: 'a', token: 1 }, consumedTokenRef));
 
-    expect(fitView).not.toHaveBeenCalled();
-
-    getNode.mockReturnValue({ id: 'a' });
-    rerender({ focusRequest: { nodeId: 'a', token: 1 }, isLayouting: false });
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
 
     expect(fitView).toHaveBeenCalledWith({
       padding: 0.4,
@@ -77,5 +84,39 @@ describe('useFocusNode', () => {
       maxZoom: 1.2,
       nodes: [{ id: 'a' }],
     });
+  });
+
+  it('does not re-focus after remount when the token was already consumed', () => {
+    const consumedTokenRef = { current: 1 as number | undefined };
+
+    const { unmount } = renderHook(
+      () => useFocusNode({ nodeId: 'a', token: 1 }, consumedTokenRef),
+    );
+
+    expect(fitView).not.toHaveBeenCalled();
+
+    unmount();
+    fitView.mockClear();
+
+    renderHook(
+      () => useFocusNode({ nodeId: 'a', token: 1 }, consumedTokenRef),
+    );
+
+    expect(fitView).not.toHaveBeenCalled();
+  });
+
+  it('stops retrying after FOCUS_MAX_ATTEMPTS without consuming the token', async () => {
+    getNode.mockReturnValue(undefined);
+    const consumedTokenRef = { current: undefined as number | undefined };
+
+    renderHook(() => useFocusNode({ nodeId: 'a', token: 1 }, consumedTokenRef));
+
+    await flushAnimationFrames(FOCUS_MAX_ATTEMPTS);
+    expect(fitView).not.toHaveBeenCalled();
+    expect(consumedTokenRef.current).toBeUndefined();
+
+    getNode.mockReturnValue({ id: 'a' });
+    await flushAnimationFrames(1);
+    expect(fitView).not.toHaveBeenCalled();
   });
 });

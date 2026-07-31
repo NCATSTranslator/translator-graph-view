@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import type { GraphAnnotation, FlowGraphNode } from '../../types';
-import { useLayoutSync, useAnnotationSync } from './hooks';
+import type { GraphAnnotation, FlowGraphNode, FlowNode } from '../../types';
+import { useLayoutSync, useAnnotationSync, hasPendingFocusRequest } from './hooks';
 import { mergeGraphAndAnnotationNodes } from '../../utils/annotationTransform';
 
 const fitView = vi.fn();
@@ -24,15 +24,33 @@ const annotations: GraphAnnotation[] = [
   { id: 'ann-1', text: 'Note', position: { x: 50, y: 50 } },
 ];
 
+function createConsumedFocusTokenRef(initial?: number) {
+  return { current: initial as number | undefined };
+}
+
+describe('hasPendingFocusRequest', () => {
+  it('returns true when a focus token has not been consumed', () => {
+    const consumedFocusTokenRef = createConsumedFocusTokenRef();
+    expect(hasPendingFocusRequest({ nodeId: 'a', token: 1 }, consumedFocusTokenRef)).toBe(true);
+  });
+
+  it('returns false when the focus token was already consumed', () => {
+    const consumedFocusTokenRef = createConsumedFocusTokenRef(1);
+    expect(hasPendingFocusRequest({ nodeId: 'a', token: 1 }, consumedFocusTokenRef)).toBe(false);
+  });
+});
+
 describe('useLayoutSync', () => {
   beforeEach(() => {
     fitView.mockReset();
   });
 
-  it('sets only layouted graph nodes (annotations are owned by useAnnotationSync)', () => {
+  it('sets layouted graph nodes while preserving existing annotation nodes', () => {
     vi.useFakeTimers();
     const setNodes = vi.fn();
     const setEdges = vi.fn();
+    const consumedFocusTokenRef = createConsumedFocusTokenRef();
+    const annotationNode = mergeGraphAndAnnotationNodes([], annotations, false)[0];
 
     renderHook(() => useLayoutSync({
       layoutedNodes: layoutedGraph,
@@ -41,12 +59,67 @@ describe('useLayoutSync', () => {
       setNodes,
       setEdges,
       fitView,
+      consumedFocusTokenRef,
     }));
 
-    expect(setNodes).toHaveBeenCalledWith(layoutedGraph);
+    expect(setNodes).toHaveBeenCalledTimes(1);
+    const updateNodes = setNodes.mock.calls[0][0] as (current: FlowNode[]) => FlowNode[];
+    expect(updateNodes([])).toEqual(layoutedGraph);
+    expect(updateNodes([annotationNode])).toEqual([...layoutedGraph, annotationNode]);
     expect(setEdges).toHaveBeenCalledWith([]);
     vi.advanceTimersByTime(50);
     expect(fitView).toHaveBeenCalledWith({ padding: 0.1, duration: 200 });
+    vi.useRealTimers();
+  });
+
+  it('does not fit the viewport when layout positions are unchanged', () => {
+    vi.useFakeTimers();
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const consumedFocusTokenRef = createConsumedFocusTokenRef();
+
+    const { rerender } = renderHook(
+      (props: { layoutedNodes: FlowGraphNode[] }) => useLayoutSync({
+        layoutedNodes: props.layoutedNodes,
+        layoutedEdges: [],
+        isLayouting: false,
+        setNodes,
+        setEdges,
+        fitView,
+        consumedFocusTokenRef,
+      }),
+      { initialProps: { layoutedNodes: layoutedGraph } },
+    );
+
+    fitView.mockClear();
+    rerender({ layoutedNodes: [{ ...layoutedGraph[0] }] });
+
+    vi.advanceTimersByTime(50);
+    expect(setNodes).toHaveBeenCalled();
+    expect(fitView).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('does not fit the viewport when a focus token is still pending', () => {
+    vi.useFakeTimers();
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const consumedFocusTokenRef = createConsumedFocusTokenRef();
+
+    renderHook(() => useLayoutSync({
+      layoutedNodes: layoutedGraph,
+      layoutedEdges: [],
+      isLayouting: false,
+      setNodes,
+      setEdges,
+      fitView,
+      focusRequest: { nodeId: 'a', token: 1 },
+      consumedFocusTokenRef,
+    }));
+
+    vi.advanceTimersByTime(50);
+    expect(setNodes).toHaveBeenCalled();
+    expect(fitView).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 });
