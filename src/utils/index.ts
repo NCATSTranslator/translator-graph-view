@@ -4,6 +4,8 @@ export {
   getPrimaryType,
 } from './colorGenerator';
 
+export { cn } from './cn';
+
 export {
   transformNodesToFlow,
   transformEdgesToFlow,
@@ -13,3 +15,9 @@ export {
   NODE_WIDTH,
   NODE_HEIGHT,
 } from './dataTransform';
+
+export {
+  transformAnnotationsToFlow,
+  extractAnnotationsFromFlow,
+  isAnnotationNode,
+} from './annotationTransform';

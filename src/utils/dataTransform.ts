@@ -2,7 +2,7 @@ import type {
   GraphData,
   GraphNode,
   GraphEdge,
-  FlowNode,
+  FlowGraphNode,
   FlowEdge,
   GraphNodeData,
   GraphEdgeData,
@@ -17,7 +17,7 @@ export const NODE_HEIGHT = 60;
 /**
  * Convert GraphData to ReactFlow nodes
  */
-export function transformNodesToFlow(data: GraphData): FlowNode[] {
+export function transformNodesToFlow(data: GraphData): FlowGraphNode[] {
   return Object.values(data.nodes).map((node) => {
     const primaryType = getPrimaryType(node.types);
     const color = getColorForType(primaryType);
