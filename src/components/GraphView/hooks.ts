@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction, MutableRefObject } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { useReactFlow } from '@xyflow/react';
 import type {
@@ -29,6 +29,16 @@ import { measureNodeGeometry, measureEdgeGeometry } from '../../utils/hoverGeome
 type SetNodes = Dispatch<SetStateAction<FlowNode[]>>;
 type SetEdges = Dispatch<SetStateAction<FlowEdge[]>>;
 
+/** True when a focus request has a token that has not yet been consumed. */
+export function hasPendingFocusRequest(
+  focusRequest: GraphFocusRequest | null | undefined,
+  consumedTokenRef: MutableRefObject<number | undefined>,
+): boolean {
+  const token = focusRequest?.token;
+  if (token == null || !focusRequest?.nodeId) return false;
+  return consumedTokenRef.current !== token;
+}
+
 /**
  * Push a fresh layout result into React Flow's controlled state and
  * fit the viewport after the DOM commits. Annotation nodes are owned by
@@ -41,20 +51,47 @@ export interface UseLayoutSyncOptions {
   setNodes: SetNodes;
   setEdges: SetEdges;
   fitView: (opts?: { padding?: number; duration?: number }) => void;
+  focusRequest?: GraphFocusRequest | null;
+  consumedFocusTokenRef: MutableRefObject<number | undefined>;
 }
 
 export function useLayoutSync({
-  layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView,
+  layoutedNodes,
+  layoutedEdges,
+  isLayouting,
+  setNodes,
+  setEdges,
+  fitView,
+  focusRequest,
+  consumedFocusTokenRef,
 }: UseLayoutSyncOptions): void {
+  const fitViewRef = useRef(fitView);
+  fitViewRef.current = fitView;
+  const layoutKey = getLayoutKey(layoutedNodes);
+  const prevLayoutKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (isLayouting || layoutedNodes.length === 0) return;
-    setNodes(layoutedNodes);
+    // Preserve annotation nodes already on the canvas. useAnnotationSync owns
+    // merging from props, but layout sync can re-run when fitView identity
+    // changes and must not wipe annotations added since the last layout pass.
+    setNodes((current) => {
+      const annotationNodes = current.filter(isAnnotationNode);
+      return [...layoutedNodes, ...annotationNodes];
+    });
     setEdges(layoutedEdges);
+
+    const layoutChanged = prevLayoutKeyRef.current !== layoutKey;
+    prevLayoutKeyRef.current = layoutKey;
+    if (!layoutChanged) return;
+    // Defer to useFocusNode when a focus request is waiting for layout to finish.
+    if (hasPendingFocusRequest(focusRequest, consumedFocusTokenRef)) return;
+
     const timer = setTimeout(() => {
-      fitView({ padding: 0.1, duration: 200 });
+      fitViewRef.current({ padding: 0.1, duration: 200 });
     }, 50);
     return () => clearTimeout(timer);
-  }, [layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView]);
+  }, [layoutKey, layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, focusRequest, consumedFocusTokenRef]);
 }
 
 export interface UseAnnotationSyncOptions {
@@ -176,28 +213,68 @@ export function useControlledSelection(
 
 const focusViewOptions = { padding: 0.4, duration: 300, maxZoom: 1.2 };
 
+/** rAF retries while waiting for a node to appear in the React Flow store. */
+export const FOCUS_MAX_ATTEMPTS = 30;
+
 /**
  * Pan/zoom the viewport to frame a node when `focusRequest.token` changes.
+ * Must run inside a mounted {@link ReactFlow} tree so the store can resolve nodes.
+ * `consumedTokenRef` lives on a parent that survives ReactFlow remounts so each
+ * token is only acted on once.
+ *
+ * The token is marked consumed as soon as the target node is found, before
+ * `fitView` resolves. If `fitView` fails silently the token will not retry
+ * until the consumer bumps it.
+ *
+ * When the node is not in the store yet, focus retries for up to
+ * {@link FOCUS_MAX_ATTEMPTS} animation frames (~500 ms). After that the attempt
+ * stops without consuming the token; a remount or a new token is required to retry.
  */
 export function useFocusNode(
   focusRequest: GraphFocusRequest | null | undefined,
-  isLayouting: boolean,
+  consumedTokenRef: MutableRefObject<number | undefined>,
 ): void {
   const { fitView, getNode } = useReactFlow();
-  const lastTokenRef = useRef<number | undefined>(undefined);
+  const fitViewRef = useRef(fitView);
+  fitViewRef.current = fitView;
+  const getNodeRef = useRef(getNode);
+  getNodeRef.current = getNode;
+
+  const focusToken = focusRequest?.token;
+  const focusNodeId = focusRequest?.nodeId;
 
   useEffect(() => {
-    if (!focusRequest || isLayouting) return;
-    if (lastTokenRef.current === focusRequest.token) return;
+    if (focusToken == null || !focusNodeId) return;
+    if (consumedTokenRef.current === focusToken) return;
 
-    if (!getNode(focusRequest.nodeId)) return;
+    let cancelled = false;
+    let attempts = 0;
+    let frameId = 0;
 
-    lastTokenRef.current = focusRequest.token;
-    void fitView({
-      ...focusViewOptions,
-      nodes: [{ id: focusRequest.nodeId }],
-    });
-  }, [focusRequest, isLayouting, fitView, getNode]);
+    const tryFocus = () => {
+      if (cancelled) return;
+
+      if (!getNodeRef.current(focusNodeId)) {
+        if (attempts < FOCUS_MAX_ATTEMPTS) {
+          attempts += 1;
+          frameId = requestAnimationFrame(tryFocus);
+        }
+        return;
+      }
+
+      consumedTokenRef.current = focusToken;
+      void fitViewRef.current({
+        ...focusViewOptions,
+        nodes: [{ id: focusNodeId }],
+      });
+    };
+
+    tryFocus();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [focusToken, focusNodeId]);
 }
 
 /**
