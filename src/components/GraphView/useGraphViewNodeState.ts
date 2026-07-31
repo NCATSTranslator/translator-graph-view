@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   useNodesState,
   useEdgesState,
@@ -9,7 +10,6 @@ import {
   useLayoutSync,
   useControlledSelection,
   useControlledHover,
-  useFocusNode,
   useAnnotationSync,
 } from './hooks';
 
@@ -39,6 +39,7 @@ export function useGraphViewNodeState({
   focusRequest,
 }: UseGraphViewNodeStateOptions) {
   const { fitView } = useReactFlow();
+  const consumedFocusTokenRef = useRef<number | undefined>(undefined);
 
   const { nodes: layoutedNodes, edges: layoutedEdges, isLayouting } = useGraphLayout({
     nodes: initialNodes,
@@ -50,7 +51,16 @@ export function useGraphViewNodeState({
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
 
-  useLayoutSync({ layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView });
+  useLayoutSync({
+    layoutedNodes,
+    layoutedEdges,
+    isLayouting,
+    setNodes,
+    setEdges,
+    fitView,
+    focusRequest,
+    consumedFocusTokenRef,
+  });
 
   const { handleNodeDragStop, annotationActions } = useAnnotationSync({
     annotations,
@@ -61,7 +71,6 @@ export function useGraphViewNodeState({
 
   useControlledSelection(selectedIds, setNodes, setEdges);
   useControlledHover(hoveredNodeId, hoveredEdgeId, setNodes, setEdges);
-  useFocusNode(focusRequest, isLayouting);
 
   return {
     isLayouting,
@@ -71,5 +80,6 @@ export function useGraphViewNodeState({
     onEdgesChange,
     handleNodeDragStop,
     annotationActions,
+    consumedFocusTokenRef,
   };
 }

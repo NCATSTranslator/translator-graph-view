@@ -19,6 +19,7 @@ export interface GraphViewState {
   handleSelectionChange: ReturnType<typeof useGraphViewInteraction>['handleSelectionChange'];
   handleNodeDragStop: ReturnType<typeof useGraphViewNodeState>['handleNodeDragStop'];
   annotationActions: AnnotationActions;
+  consumedFocusTokenRef: ReturnType<typeof useGraphViewNodeState>['consumedFocusTokenRef'];
   settings: GraphSettings;
   graphSurfaceRef: ReturnType<typeof useGraphViewInteraction>['graphSurfaceRef'];
   hoverHandlers: HoverGeometryHandlers;

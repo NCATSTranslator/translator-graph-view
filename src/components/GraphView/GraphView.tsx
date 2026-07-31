@@ -22,6 +22,7 @@ import { GraphNode } from '../nodes';
 import { GraphEdge } from '../edges';
 import { GraphAnnotationNode } from '../annotations';
 import { useGraphViewState } from './useGraphViewState';
+import { GraphFocusHandler } from './GraphFocusHandler';
 import styles from './GraphView.module.scss';
 
 const nodeTypes: NodeTypes = {
@@ -55,7 +56,7 @@ interface GraphViewInnerProps extends GraphViewProps {
 }
 
 function GraphViewInner(props: GraphViewInnerProps) {
-  const { className, showMiniMap = true } = props;
+  const { className, showMiniMap = true, focusRequest } = props;
   const {
     isLayouting,
     nodes,
@@ -70,6 +71,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
     hoverHandlers,
     handleNodeClick,
     handleEdgeClick,
+    consumedFocusTokenRef,
   } = useGraphViewState(props);
 
   if (isLayouting) {
@@ -110,6 +112,10 @@ function GraphViewInner(props: GraphViewInnerProps) {
             className={cn(styles.graphView, className)}
             proOptions={proOptions}
           >
+            <GraphFocusHandler
+              focusRequest={focusRequest}
+              consumedTokenRef={consumedFocusTokenRef}
+            />
             <Background color="#ddd" gap={20} />
             <Controls />
             {showMiniMap && (
