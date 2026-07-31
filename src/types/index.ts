@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 
 // Core data types from input schema
@@ -104,8 +105,32 @@ export interface GraphEdgeData extends Record<string, unknown> {
   hovered?: boolean;
 }
 
+// Annotation types
+export interface GraphAnnotation {
+  id: string;
+  text: string;
+  position: { x: number; y: number };
+}
+
+export interface GraphAnnotationStyles {
+  backgroundColor?: string;
+  className?: string;
+  deleteButton?: {
+    backgroundColor?: string;
+    className?: string;
+    icon?: ReactNode;
+  };
+}
+
+export interface GraphAnnotationData extends Record<string, unknown> {
+  text: string;
+  annotation: GraphAnnotation;
+}
+
 // ReactFlow typed nodes and edges
-export type FlowNode = Node<GraphNodeData, 'graphNode'>;
+export type FlowGraphNode = Node<GraphNodeData, 'graphNode'>;
+export type FlowAnnotationNode = Node<GraphAnnotationData, 'graphAnnotation'>;
+export type FlowNode = FlowGraphNode | FlowAnnotationNode;
 export type FlowEdge = Edge<GraphEdgeData>;
 
 // Hover geometry types
@@ -122,6 +147,12 @@ export interface HoverGeometry {
   anchor: { x: number; y: number };
   /** Which anchor position was used to compute `anchor`. */
   anchorPosition: HoverAnchorPosition;
+}
+
+/** Imperative viewport focus request; `token` must change on each request. */
+export interface GraphFocusRequest {
+  nodeId: string;
+  token: number;
 }
 
 // Component props
@@ -141,6 +172,16 @@ export interface GraphViewProps {
   nodeHoverAnchor?: HoverAnchorPosition;
   edgeHoverAnchor?: HoverAnchorPosition;
   selectedIds?: string[];
+  /** Pan/zoom the viewport to frame `nodeId`. Re-triggers when `token` changes. */
+  focusRequest?: GraphFocusRequest | null;
   multiEdgeSpacing?: number;
+  /** Controlled annotation overlays (graph-space coordinates). */
+  annotations?: GraphAnnotation[];
+  /** Fires when an annotation is dragged, edited, or deleted. */
+  onAnnotationsChange?: (annotations: GraphAnnotation[]) => void;
+  /** Client-configurable annotation appearance. */
+  annotationStyles?: GraphAnnotationStyles;
+  /** Show the zoomable/pannable minimap. */
+  showMiniMap?: boolean;
   className?: string;
 }
