@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { GraphNodeData } from '../../types';
 import { capitalizeAllWords, getNodeTypeIcon } from '../../utils/utils';
+import { cn } from '../../utils/cn';
 import styles from './GraphNode.module.scss';
 
 function GraphNodeComponent({ data, selected }: NodeProps) {
@@ -15,11 +16,11 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
     ? nodeData.label.toUpperCase()
     : capitalizeAllWords(nodeData.label);
 
-  const className = [
+  const className = cn(
     styles.node,
-    selected ? styles.selected : '',
-    nodeData.hovered ? styles.hovered : '',
-  ].filter(Boolean).join(' ');
+    selected && styles.selected,
+    nodeData.hovered && styles.hovered,
+  );
 
   return (
     <div
