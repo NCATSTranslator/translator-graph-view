@@ -1,17 +1,29 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Node, Edge } from '@xyflow/react';
+import { useReactFlow } from '@xyflow/react';
 import type {
   FlowNode,
+  FlowGraphNode,
   FlowEdge,
   GraphData,
   GraphNode,
   GraphEdge,
   GraphNodeData,
   GraphEdgeData,
+  GraphAnnotation,
+  GraphFocusRequest,
   HoverAnchorPosition,
   HoverGeometry,
 } from '../../types';
+import type { AnnotationActions } from '../../hooks/useAnnotationActions';
+import { readOnlyAnnotationActions } from '../../hooks/useAnnotationActions';
+import {
+  isAnnotationNode,
+  mergeGraphAndAnnotationNodes,
+  getLayoutKey,
+  getAnnotationsKey,
+} from '../../utils/annotationTransform';
 import { measureNodeGeometry, measureEdgeGeometry } from '../../utils/hoverGeometry';
 
 type SetNodes = Dispatch<SetStateAction<FlowNode[]>>;
@@ -19,10 +31,11 @@ type SetEdges = Dispatch<SetStateAction<FlowEdge[]>>;
 
 /**
  * Push a fresh layout result into React Flow's controlled state and
- * fit the viewport after the DOM commits.
+ * fit the viewport after the DOM commits. Annotation nodes are owned by
+ * {@link useAnnotationSync}.
  */
 export interface UseLayoutSyncOptions {
-  layoutedNodes: FlowNode[];
+  layoutedNodes: FlowGraphNode[];
   layoutedEdges: FlowEdge[];
   isLayouting: boolean;
   setNodes: SetNodes;
@@ -44,6 +57,97 @@ export function useLayoutSync({
   }, [layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, fitView]);
 }
 
+export interface UseAnnotationSyncOptions {
+  annotations?: GraphAnnotation[];
+  layoutedNodes: FlowGraphNode[];
+  setNodes: SetNodes;
+  onAnnotationsChange?: (annotations: GraphAnnotation[]) => void;
+}
+
+export interface AnnotationSyncHandlers {
+  handleNodeDragStop: (_event: React.MouseEvent, node: Node) => void;
+  annotationActions: AnnotationActions;
+}
+
+/**
+ * Keep annotation nodes in sync with the controlled `annotations` prop and
+ * emit position updates after drag.
+ */
+export function useAnnotationSync({
+  annotations,
+  layoutedNodes,
+  setNodes,
+  onAnnotationsChange,
+}: UseAnnotationSyncOptions): AnnotationSyncHandlers {
+  const layoutedNodesRef = useRef(layoutedNodes);
+  layoutedNodesRef.current = layoutedNodes;
+
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+
+  const readOnly = !onAnnotationsChange;
+
+  const updateAnnotations = useCallback(
+    (updater: (prev: GraphAnnotation[]) => GraphAnnotation[]) => {
+      if (!onAnnotationsChange) return;
+      onAnnotationsChange(updater(annotationsRef.current ?? []));
+    },
+    [onAnnotationsChange],
+  );
+
+  const onTextChange = useCallback(
+    (id: string, text: string) => {
+      updateAnnotations((prev) => prev.map((annotation) => (
+        annotation.id === id ? { ...annotation, text } : annotation
+      )));
+    },
+    [updateAnnotations],
+  );
+
+  const onDelete = useCallback(
+    (id: string) => {
+      updateAnnotations((prev) => prev.filter((annotation) => annotation.id !== id));
+    },
+    [updateAnnotations],
+  );
+
+  const annotationActions = useMemo<AnnotationActions>(
+    () => (
+      readOnly
+        ? readOnlyAnnotationActions
+        : { onTextChange, onDelete, readOnly: false }
+    ),
+    [readOnly, onTextChange, onDelete],
+  );
+
+  const layoutKey = getLayoutKey(layoutedNodes);
+  const annotationsKey = getAnnotationsKey(annotations);
+
+  useEffect(() => {
+    setNodes(mergeGraphAndAnnotationNodes(
+      layoutedNodesRef.current,
+      annotationsRef.current,
+      readOnly,
+    ));
+  }, [layoutKey, annotationsKey, readOnly, setNodes]);
+
+  const handleNodeDragStop = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (!isAnnotationNode(node as FlowNode) || !onAnnotationsChange) return;
+      onAnnotationsChange(
+        (annotationsRef.current ?? []).map((annotation) => (
+          annotation.id === node.id
+            ? { ...annotation, position: { x: node.position.x, y: node.position.y } }
+            : annotation
+        )),
+      );
+    },
+    [onAnnotationsChange],
+  );
+
+  return { handleNodeDragStop, annotationActions };
+}
+
 /**
  * Mark nodes/edges as selected based on a controlled `selectedIds` prop.
  * Skips work when the set of ids hasn't changed.
@@ -61,9 +165,39 @@ export function useControlledSelection(
     prevRef.current = selectedIds;
 
     const selectedSet = new Set(selectedIds);
-    setNodes((nds) => nds.map((node) => ({ ...node, selected: selectedSet.has(node.id) })));
+    setNodes((nds) => nds.map((node) => (
+      isAnnotationNode(node)
+        ? node
+        : { ...node, selected: selectedSet.has(node.id) }
+    )));
     setEdges((eds) => eds.map((edge) => ({ ...edge, selected: selectedSet.has(edge.id) })));
   }, [selectedIds, setNodes, setEdges]);
+}
+
+const focusViewOptions = { padding: 0.4, duration: 300, maxZoom: 1.2 };
+
+/**
+ * Pan/zoom the viewport to frame a node when `focusRequest.token` changes.
+ */
+export function useFocusNode(
+  focusRequest: GraphFocusRequest | null | undefined,
+  isLayouting: boolean,
+): void {
+  const { fitView, getNode } = useReactFlow();
+  const lastTokenRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!focusRequest || isLayouting) return;
+    if (lastTokenRef.current === focusRequest.token) return;
+
+    if (!getNode(focusRequest.nodeId)) return;
+
+    lastTokenRef.current = focusRequest.token;
+    void fitView({
+      ...focusViewOptions,
+      nodes: [{ id: focusRequest.nodeId }],
+    });
+  }, [focusRequest, isLayouting, fitView, getNode]);
 }
 
 /**
@@ -84,6 +218,7 @@ export function useControlledHover(
     prevNodeRef.current = hoveredNodeId;
     setNodes((nds) =>
       nds.map((node) => {
+        if (isAnnotationNode(node)) return node;
         const shouldHover = node.id === hoveredNodeId;
         const wasHovered = node.id === prev;
         if (!shouldHover && !wasHovered) return node;
@@ -202,7 +337,7 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
 
   const handleNodeMouseEnter = useCallback(
     (_e: React.MouseEvent, node: Node) => {
-      if (!onNodeHover) return;
+      if (!onNodeHover || isAnnotationNode(node as FlowNode)) return;
       const graphNode = refs.data.current.nodes[node.id];
       if (!graphNode) return;
       refs.hoverTarget.current = { kind: 'node', id: node.id };
