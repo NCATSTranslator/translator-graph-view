@@ -6,7 +6,7 @@ import {
   type Selection,
 } from '../src';
 import { smallGraph, mediumGraph } from './sampleData';
-import { useTooltipDelay, useExampleData, useGraphHoverState } from './hooks';
+import { useTooltipDelay, useExampleData, useGraphHoverState, usePersistedAnnotations, usePersistedShowMiniMap } from './hooks';
 import {
   ToggleList,
   SelectionList,
@@ -52,6 +52,8 @@ function App() {
   const [selection, setSelection] = useState<Selection>({ nodes: [], edges: [] });
   const [sidebarHoveredNodeId, setSidebarHoveredNodeId] = useState<string | null>(null);
   const [sidebarHoveredEdgeId, setSidebarHoveredEdgeId] = useState<string | null>(null);
+  const { showMiniMap, setShowMiniMap } = usePersistedShowMiniMap();
+  const { annotations, setAnnotations, addAnnotation } = usePersistedAnnotations(dataset);
 
   const hover = useGraphHoverState(TOOLTIP_OFFSET);
   const tooltipNode = useTooltipDelay(hover.hoveredNode, TOOLTIP_DELAY);
@@ -88,6 +90,17 @@ function App() {
           <ToggleList items={LAYOUTS} active={layout} onChange={setLayout} />
         </SidebarSection>
 
+        <SidebarSection title="Display">
+          <ToggleList
+            items={[
+              { label: 'MiniMap on', value: 'on' },
+              { label: 'MiniMap off', value: 'off' },
+            ]}
+            active={showMiniMap ? 'on' : 'off'}
+            onChange={(value) => setShowMiniMap(value === 'on')}
+          />
+        </SidebarSection>
+
         <SidebarSection title="Selection">
           <SelectionCounts selection={selection} />
           <SelectionList
@@ -110,6 +123,13 @@ function App() {
             hoveredEdge={hover.hoveredEdge}
             hoverGeometry={hover.hoverGeometry}
           />
+        </SidebarSection>
+
+        <SidebarSection title="Annotations">
+          <button type="button" onClick={addAnnotation}>Add annotation</button>
+          <div className={styles.stats}>
+            <div>Count: {annotations.length}</div>
+          </div>
         </SidebarSection>
 
         <SidebarSection title="Stats">
@@ -142,9 +162,12 @@ function App() {
           onEdgeHover={hover.handleEdgeHover}
           hoveredNodeId={sidebarHoveredNodeId}
           hoveredEdgeId={sidebarHoveredEdgeId}
+          annotations={annotations}
+          onAnnotationsChange={setAnnotations}
           nodeHoverAnchor="topCenter"
           edgeHoverAnchor="midpoint"
           showEdgeLabels={false}
+          showMiniMap={showMiniMap}
         />
         {(tooltipNode || tooltipEdge) && hover.tooltipPos && (
           <div

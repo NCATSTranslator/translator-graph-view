@@ -1,10 +1,122 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import type {
   GraphData,
   GraphNodeType,
   GraphEdgeType,
   HoverGeometry,
+  GraphAnnotation,
 } from '../src';
+
+const ANNOTATIONS_STORAGE_PREFIX = 'translator-graph-view:annotations:';
+const SHOW_MINIMAP_STORAGE_KEY = 'translator-graph-view:showMiniMap';
+
+interface LocalStorageOptions<T> {
+  read: (key: string) => T;
+  write: (key: string, value: T) => void;
+}
+
+function useLocalStorage<T>(
+  key: string,
+  options: LocalStorageOptions<T>,
+): [T, (value: SetStateAction<T>) => void] {
+  const { read, write } = options;
+  const [state, setState] = useState(() => read(key));
+
+  useEffect(() => {
+    setState(read(key));
+  }, [key, read]);
+
+  const setValue = useCallback((value: SetStateAction<T>) => {
+    setState((prev) => {
+      const next = typeof value === 'function'
+        ? (value as (previous: T) => T)(prev)
+        : value;
+      try {
+        write(key, next);
+      } catch {
+        // Ignore storage errors (private browsing, quota exceeded, etc.)
+      }
+      return next;
+    });
+  }, [key, write]);
+
+  return [state, setValue];
+}
+
+function readShowMiniMap(key: string): boolean {
+  try {
+    return localStorage.getItem(key) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function writeShowMiniMap(key: string, show: boolean): void {
+  localStorage.setItem(key, String(show));
+}
+
+export function usePersistedShowMiniMap(): {
+  showMiniMap: boolean;
+  setShowMiniMap: (show: boolean) => void;
+} {
+  const [showMiniMap, setShowMiniMap] = useLocalStorage(SHOW_MINIMAP_STORAGE_KEY, {
+    read: readShowMiniMap,
+    write: writeShowMiniMap,
+  });
+
+  return { showMiniMap, setShowMiniMap };
+}
+
+function readAnnotations(key: string): GraphAnnotation[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is GraphAnnotation =>
+        typeof item === 'object'
+        && item !== null
+        && typeof item.id === 'string'
+        && typeof item.text === 'string'
+        && typeof item.position === 'object'
+        && item.position !== null
+        && typeof item.position.x === 'number'
+        && typeof item.position.y === 'number',
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeAnnotations(key: string, annotations: GraphAnnotation[]): void {
+  localStorage.setItem(key, JSON.stringify(annotations));
+}
+
+export function usePersistedAnnotations(dataset: string): {
+  annotations: GraphAnnotation[];
+  setAnnotations: (value: SetStateAction<GraphAnnotation[]>) => void;
+  addAnnotation: () => void;
+} {
+  const storageKey = `${ANNOTATIONS_STORAGE_PREFIX}${dataset}`;
+  const [annotations, setAnnotations] = useLocalStorage(storageKey, {
+    read: readAnnotations,
+    write: writeAnnotations,
+  });
+
+  const addAnnotation = useCallback(() => {
+    setAnnotations((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        text: '',
+        position: { x: 80 + prev.length * 24, y: 80 + prev.length * 24 },
+      },
+    ]);
+  }, [setAnnotations]);
+
+  return { annotations, setAnnotations, addAnnotation };
+}
 
 /**
  * Delay `hovered` becoming the tooltip target until it's been stable for
