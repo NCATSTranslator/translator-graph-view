@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ELK from 'elkjs/lib/elk-api.js';
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs';
-import type { FlowNode, FlowEdge, LayoutType } from '../types';
+import type { FlowGraphNode, FlowEdge, LayoutType } from '../types';
 import { getLayoutOptions } from '../layouts';
 import { NODE_WIDTH, NODE_HEIGHT } from '../utils';
 
 interface UseGraphLayoutOptions {
-  nodes: FlowNode[];
+  nodes: FlowGraphNode[];
   edges: FlowEdge[];
   layout: LayoutType;
   elkWorkerUrl: string;
 }
 
 interface UseGraphLayoutResult {
-  nodes: FlowNode[];
+  nodes: FlowGraphNode[];
   edges: FlowEdge[];
   isLayouting: boolean;
 }
@@ -29,7 +29,7 @@ function toElkLayoutOptions(options: ReturnType<typeof getLayoutOptions>): Layou
   return result;
 }
 
-function buildElkGraph(nodes: FlowNode[], edges: FlowEdge[], layout: LayoutType): ElkNode {
+function buildElkGraph(nodes: FlowGraphNode[], edges: FlowEdge[], layout: LayoutType): ElkNode {
   const elkNodes: ElkNode[] = nodes.map((node) => ({
     id: node.id,
     width: NODE_WIDTH,
@@ -48,7 +48,7 @@ function buildElkGraph(nodes: FlowNode[], edges: FlowEdge[], layout: LayoutType)
   };
 }
 
-function applyElkPositions(nodes: FlowNode[], layoutedGraph: ElkNode): FlowNode[] {
+function applyElkPositions(nodes: FlowGraphNode[], layoutedGraph: ElkNode): FlowGraphNode[] {
   const positionMap = new Map<string, { x: number; y: number }>();
   for (const child of layoutedGraph.children ?? []) {
     positionMap.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
@@ -67,7 +67,7 @@ export function useGraphLayout({
 }: UseGraphLayoutOptions): UseGraphLayoutResult {
   const elk = useMemo(() => new ELK({ workerUrl: elkWorkerUrl }), [elkWorkerUrl]);
 
-  const [layoutedNodes, setLayoutedNodes] = useState<FlowNode[]>(nodes);
+  const [layoutedNodes, setLayoutedNodes] = useState<FlowGraphNode[]>(nodes);
   const [layoutedEdges, setLayoutedEdges] = useState<FlowEdge[]>(edges);
   const [isLayouting, setIsLayouting] = useState(false);
 

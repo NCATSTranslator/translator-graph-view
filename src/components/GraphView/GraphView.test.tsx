@@ -75,4 +75,45 @@ describe('GraphView', () => {
       expect(screen.getByText('Ibuprofen')).toBeInTheDocument();
     });
   });
+
+  it('renders annotations from the controlled annotations prop', async () => {
+    render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        annotations={[
+          { id: 'ann-1', text: 'Important note', position: { x: 50, y: 50 } },
+        ]}
+        onAnnotationsChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Important note')).toBeInTheDocument();
+    });
+  });
+
+  it('hides the minimap when showMiniMap is false', async () => {
+    render(
+      <GraphView data={data} elkWorkerUrl="mock://elk" showMiniMap={false} />,
+    );
+    await screen.findByText('Aspirin');
+    expect(document.querySelector('[data-testid="rf__minimap"]')).not.toBeInTheDocument();
+  });
+
+  it('removes the minimap when showMiniMap toggles off', async () => {
+    const { rerender } = render(
+      <GraphView data={data} elkWorkerUrl="mock://elk" showMiniMap />,
+    );
+    await screen.findByText('Aspirin');
+    expect(document.querySelector('[data-testid="rf__minimap"]')).toBeInTheDocument();
+
+    rerender(
+      <GraphView data={data} elkWorkerUrl="mock://elk" showMiniMap={false} />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-testid="rf__minimap"]')).not.toBeInTheDocument();
+    });
+  });
 });
