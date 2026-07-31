@@ -1,7 +1,10 @@
 import { createContext, useContext } from 'react';
 
+import type { GraphAnnotationStyles } from '../types';
+
 export interface GraphSettings {
   multiEdgeSpacing: number;
+  annotationStyles?: GraphAnnotationStyles;
 }
 
 const defaults: GraphSettings = {
