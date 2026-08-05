@@ -14,6 +14,7 @@ export interface GraphViewState {
   isLayouting: boolean;
   nodes: ReturnType<typeof useGraphViewNodeState>['nodes'];
   edges: ReturnType<typeof useGraphViewNodeState>['edges'];
+  layoutKey: string;
   onNodesChange: ReturnType<typeof useGraphViewNodeState>['onNodesChange'];
   onEdgesChange: ReturnType<typeof useGraphViewNodeState>['onEdgesChange'];
   handleSelectionChange: ReturnType<typeof useGraphViewInteraction>['handleSelectionChange'];

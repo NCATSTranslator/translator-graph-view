@@ -56,4 +56,7 @@ export type {
   GraphFocusRequest,
   GraphAnnotation,
   GraphAnnotationStyles,
+  NodePosition,
+  NodePositionMap,
+  FitViewPadding,
 } from './types';

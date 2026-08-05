@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Node, Edge } from '@xyflow/react';
+import type { Padding } from '@xyflow/system';
 
 // Core data types from input schema
 export interface GraphData {
@@ -72,7 +73,11 @@ export interface Provenance {
 }
 
 // Layout types
-export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid' | 'radial';
+export type LayoutType = 'hierarchical' | 'hierarchicalLR' | 'force' | 'grid' | 'radial' | 'custom';
+
+export type NodePosition = { x: number; y: number };
+
+export type NodePositionMap = Record<string, NodePosition>;
 
 // Edge path types
 export type EdgeType = 'bezier' | 'straight' | 'step' | 'smoothstep';
@@ -155,13 +160,25 @@ export interface GraphFocusRequest {
   token: number;
 }
 
+export type FitViewPadding = Padding;
+
 // Component props
 export interface GraphViewProps {
   data: GraphData;
   layout?: LayoutType;
+  /** Required when `layout` is `'custom'`. Graph-space coordinates for each node id. */
+  nodePositions?: NodePositionMap;
+  /** Padding when framing the graph via fitView. Default 0.1. */
+  fitViewPadding?: FitViewPadding;
+  /** Re-frame the viewport when this key changes (e.g. canvas id). */
+  viewportSyncKey?: string;
   edgeType?: EdgeType;
   showEdgeLabels?: boolean;
   elkWorkerUrl: string;
+  /** Fires when a graph node (not annotation) finishes dragging. Includes all graph-node positions from the current view. */
+  onGraphNodeDragStop?: (nodeId: string, position: NodePosition, allPositions: NodePositionMap) => void;
+  /** Fires after layout positions are applied: ELK layouts when computation finishes, custom layout when `nodePositions` sync. */
+  onLayoutComplete?: (positions: NodePositionMap) => void;
   onSelectionChange?: (selection: Selection) => void;
   onNodeClick?: (node: GraphNode) => void;
   onEdgeClick?: (edge: GraphEdge) => void;

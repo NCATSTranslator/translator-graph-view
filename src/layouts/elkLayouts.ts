@@ -11,7 +11,7 @@ export interface ElkLayoutOptions {
   [key: string]: string | number | boolean | undefined;
 }
 
-export const layoutConfigs: Record<LayoutType, ElkLayoutOptions> = {
+export const layoutConfigs: Record<Exclude<LayoutType, 'custom'>, ElkLayoutOptions> = {
   hierarchical: {
     'elk.algorithm': 'layered',
     'elk.direction': 'DOWN',
@@ -55,5 +55,8 @@ export const layoutConfigs: Record<LayoutType, ElkLayoutOptions> = {
 };
 
 export function getLayoutOptions(layout: LayoutType): ElkLayoutOptions {
+  if (layout === 'custom') {
+    return layoutConfigs.hierarchical;
+  }
   return layoutConfigs[layout] || layoutConfigs.hierarchical;
 }

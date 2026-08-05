@@ -23,6 +23,8 @@ import { GraphEdge } from '../edges';
 import { GraphAnnotationNode } from '../annotations';
 import { useGraphViewState } from './useGraphViewState';
 import { GraphFocusHandler } from './GraphFocusHandler';
+import { CustomLayoutFitHandler } from './CustomLayoutFitHandler';
+import { DEFAULT_FIT_VIEW_PADDING } from './constants';
 import styles from './GraphView.module.scss';
 
 const nodeTypes: NodeTypes = {
@@ -42,8 +44,6 @@ const panOnDrag: number[] = [1, 2];
 
 const proOptions = { hideAttribution: true };
 
-const fitViewOptions = { padding: 0.1 };
-
 const minimapNodeColor = '#888';
 
 function getMinimapNodeColor(node: Node): string {
@@ -56,11 +56,19 @@ interface GraphViewInnerProps extends GraphViewProps {
 }
 
 function GraphViewInner(props: GraphViewInnerProps) {
-  const { className, showMiniMap = true, focusRequest } = props;
+  const {
+    className,
+    showMiniMap = true,
+    focusRequest,
+    fitViewPadding = DEFAULT_FIT_VIEW_PADDING,
+    layout,
+    viewportSyncKey,
+  } = props;
   const {
     isLayouting,
     nodes,
     edges,
+    layoutKey,
     onNodesChange,
     onEdgesChange,
     handleSelectionChange,
@@ -73,6 +81,11 @@ function GraphViewInner(props: GraphViewInnerProps) {
     handleEdgeClick,
     consumedFocusTokenRef,
   } = useGraphViewState(props);
+
+  const fitViewOptions = useMemo(
+    () => ({ padding: fitViewPadding }),
+    [fitViewPadding],
+  );
 
   if (isLayouting) {
     return <div className={styles.loading}>Computing layout...</div>;
@@ -105,7 +118,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
             panOnScroll
             zoomOnScroll
             multiSelectionKeyCode="Shift"
-            fitView
+            fitView={layout !== 'custom'}
             fitViewOptions={fitViewOptions}
             minZoom={0.15}
             maxZoom={3}
@@ -116,8 +129,16 @@ function GraphViewInner(props: GraphViewInnerProps) {
               focusRequest={focusRequest}
               consumedTokenRef={consumedFocusTokenRef}
             />
+            <CustomLayoutFitHandler
+              layout={layout}
+              fitViewPadding={fitViewPadding}
+              viewportSyncKey={viewportSyncKey}
+              layoutKey={layoutKey}
+              focusRequest={focusRequest}
+              consumedFocusTokenRef={consumedFocusTokenRef}
+            />
             <Background color="#ddd" gap={20} />
-            <Controls />
+            <Controls fitViewOptions={fitViewOptions} />
             {showMiniMap && (
               <MiniMap
                 nodeColor={getMinimapNodeColor}
@@ -134,11 +155,20 @@ function GraphViewInner(props: GraphViewInnerProps) {
 }
 
 export function GraphView(props: GraphViewProps) {
-  const { data, edgeType, showEdgeLabels = true } = props;
+  const { data, edgeType, showEdgeLabels = true, layout, nodePositions } = props;
+
+  if (process.env.NODE_ENV !== 'production' && layout === 'custom' && !nodePositions) {
+    console.warn('GraphView: nodePositions is required when layout is "custom".');
+  }
+
+  const nodePositionsKey = useMemo(
+    () => (layout === 'custom' && nodePositions ? JSON.stringify(nodePositions) : ''),
+    [layout, nodePositions],
+  );
 
   const initialNodes = useMemo(
-    () => transformNodesToFlow(data),
-    [data],
+    () => transformNodesToFlow(data, layout === 'custom' ? nodePositions : undefined),
+    [data, layout, nodePositionsKey, nodePositions],
   );
   const initialEdges = useMemo(
     () => transformEdgesToFlow(data, edgeType, showEdgeLabels),

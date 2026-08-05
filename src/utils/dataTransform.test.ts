@@ -41,6 +41,16 @@ describe('transformNodesToFlow', () => {
     const nodes = transformNodesToFlow(sampleData);
     expect(nodes.find((n) => n.id === 'a')?.data.primaryType).toBe('Drug');
   });
+
+  it('uses provided positions when supplied', () => {
+    const nodes = transformNodesToFlow(sampleData, {
+      a: { x: 10, y: 20 },
+      b: { x: 30, y: 40 },
+    });
+    expect(nodes.find((n) => n.id === 'a')?.position).toEqual({ x: 10, y: 20 });
+    expect(nodes.find((n) => n.id === 'b')?.position).toEqual({ x: 30, y: 40 });
+    expect(nodes.find((n) => n.id === 'c')?.position).toEqual({ x: 0, y: 0 });
+  });
 });
 
 describe('transformEdgesToFlow', () => {

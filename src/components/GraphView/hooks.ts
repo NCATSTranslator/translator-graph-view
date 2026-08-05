@@ -15,16 +15,29 @@ import type {
   GraphFocusRequest,
   HoverAnchorPosition,
   HoverGeometry,
+  NodePosition,
+  NodePositionMap,
+  LayoutType,
+  FitViewPadding,
 } from '../../types';
 import type { AnnotationActions } from '../../hooks/useAnnotationActions';
 import { readOnlyAnnotationActions } from '../../hooks/useAnnotationActions';
 import {
   isAnnotationNode,
+  isGraphNode,
   mergeGraphAndAnnotationNodes,
   getLayoutKey,
+  getGraphStructureKey,
   getAnnotationsKey,
 } from '../../utils/annotationTransform';
 import { measureNodeGeometry, measureEdgeGeometry } from '../../utils/hoverGeometry';
+import { getFitViewPaddingKey } from '../../utils/positionMap';
+import {
+  DEFAULT_FIT_VIEW_PADDING,
+  scheduleFitView,
+} from './constants';
+
+export { DEFAULT_FIT_VIEW_PADDING, FIT_VIEW_DURATION_MS } from './constants';
 
 type SetNodes = Dispatch<SetStateAction<FlowNode[]>>;
 type SetEdges = Dispatch<SetStateAction<FlowEdge[]>>;
@@ -42,15 +55,19 @@ export function hasPendingFocusRequest(
 /**
  * Push a fresh layout result into React Flow's controlled state and
  * fit the viewport after the DOM commits. Annotation nodes are owned by
- * {@link useAnnotationSync}.
+ * {@link useAnnotationSync}. For `layout: 'custom'`, only edges are synced here;
+ * graph node positions are handled by {@link useAnnotationSync}.
  */
 export interface UseLayoutSyncOptions {
   layoutedNodes: FlowGraphNode[];
   layoutedEdges: FlowEdge[];
   isLayouting: boolean;
+  layoutKey: string;
+  layout?: LayoutType;
+  fitViewPadding?: FitViewPadding;
   setNodes: SetNodes;
   setEdges: SetEdges;
-  fitView: (opts?: { padding?: number; duration?: number }) => void;
+  fitView: (opts?: { padding?: FitViewPadding; duration?: number }) => void;
   focusRequest?: GraphFocusRequest | null;
   consumedFocusTokenRef: MutableRefObject<number | undefined>;
 }
@@ -59,6 +76,9 @@ export function useLayoutSync({
   layoutedNodes,
   layoutedEdges,
   isLayouting,
+  layoutKey,
+  layout,
+  fitViewPadding = DEFAULT_FIT_VIEW_PADDING,
   setNodes,
   setEdges,
   fitView,
@@ -67,11 +87,18 @@ export function useLayoutSync({
 }: UseLayoutSyncOptions): void {
   const fitViewRef = useRef(fitView);
   fitViewRef.current = fitView;
-  const layoutKey = getLayoutKey(layoutedNodes);
-  const prevLayoutKeyRef = useRef<string | null>(null);
+  const fitViewPaddingRef = useRef(fitViewPadding);
+  fitViewPaddingRef.current = fitViewPadding;
+  const prevFitViewSyncKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isLayouting || layoutedNodes.length === 0) return;
+
+    if (layout === 'custom') {
+      setEdges(layoutedEdges);
+      return;
+    }
+
     // Preserve annotation nodes already on the canvas. useAnnotationSync owns
     // merging from props, but layout sync can re-run when fitView identity
     // changes and must not wipe annotations added since the last layout pass.
@@ -81,24 +108,65 @@ export function useLayoutSync({
     });
     setEdges(layoutedEdges);
 
-    const layoutChanged = prevLayoutKeyRef.current !== layoutKey;
-    prevLayoutKeyRef.current = layoutKey;
-    if (!layoutChanged) return;
+    const fitViewSyncKey = `${layoutKey}|${getFitViewPaddingKey(fitViewPadding)}`;
+    const shouldFitView = prevFitViewSyncKeyRef.current !== fitViewSyncKey;
+    prevFitViewSyncKeyRef.current = fitViewSyncKey;
+    if (!shouldFitView) return;
     // Defer to useFocusNode when a focus request is waiting for layout to finish.
     if (hasPendingFocusRequest(focusRequest, consumedFocusTokenRef)) return;
 
-    const timer = setTimeout(() => {
-      fitViewRef.current({ padding: 0.1, duration: 200 });
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [layoutKey, layoutedNodes, layoutedEdges, isLayouting, setNodes, setEdges, focusRequest, consumedFocusTokenRef]);
+    return scheduleFitView(
+      (opts) => fitViewRef.current(opts),
+      fitViewPaddingRef.current,
+    );
+  }, [layoutKey, layoutedNodes, layoutedEdges, isLayouting, layout, fitViewPadding, setNodes, setEdges, focusRequest, consumedFocusTokenRef]);
+}
+
+function mergeCustomGraphNodes(
+  layoutedNodes: FlowGraphNode[],
+  currentNodes: FlowNode[],
+  lastAppliedPositions: Map<string, NodePosition>,
+): FlowGraphNode[] {
+  const currentGraphById = new Map(
+    currentNodes.filter(isGraphNode).map((node) => [node.id, node]),
+  );
+
+  return layoutedNodes.map((layoutNode) => {
+    const existing = currentGraphById.get(layoutNode.id);
+    if (!existing) {
+      return layoutNode;
+    }
+
+    const lastApplied = lastAppliedPositions.get(layoutNode.id);
+    const userMoved = lastApplied !== undefined
+      && (existing.position.x !== lastApplied.x || existing.position.y !== lastApplied.y);
+
+    if (userMoved) {
+      return {
+        ...layoutNode,
+        position: existing.position,
+        selected: existing.selected,
+        data: {
+          ...layoutNode.data,
+          selected: layoutNode.data.selected,
+          hovered: layoutNode.data.hovered,
+        },
+      };
+    }
+
+    return layoutNode;
+  });
 }
 
 export interface UseAnnotationSyncOptions {
   annotations?: GraphAnnotation[];
   layoutedNodes: FlowGraphNode[];
+  layoutKey?: string;
+  layout?: LayoutType;
   setNodes: SetNodes;
   onAnnotationsChange?: (annotations: GraphAnnotation[]) => void;
+  onGraphNodeDragStop?: (nodeId: string, position: NodePosition, allPositions: NodePositionMap) => void;
+  getGraphNodePositions?: () => NodePositionMap;
 }
 
 export interface AnnotationSyncHandlers {
@@ -107,20 +175,28 @@ export interface AnnotationSyncHandlers {
 }
 
 /**
- * Keep annotation nodes in sync with the controlled `annotations` prop and
- * emit position updates after drag.
+ * Keep annotation nodes in sync with the controlled `annotations` prop,
+ * sync custom-layout graph node positions, and emit position updates after drag.
+ * For ELK layouts, graph nodes are synced via {@link useLayoutSync}.
  */
 export function useAnnotationSync({
   annotations,
   layoutedNodes,
+  layoutKey: layoutKeyProp,
+  layout,
   setNodes,
   onAnnotationsChange,
+  onGraphNodeDragStop,
+  getGraphNodePositions = () => ({}),
 }: UseAnnotationSyncOptions): AnnotationSyncHandlers {
   const layoutedNodesRef = useRef(layoutedNodes);
   layoutedNodesRef.current = layoutedNodes;
 
   const annotationsRef = useRef(annotations);
   annotationsRef.current = annotations;
+
+  const lastAppliedPositionsRef = useRef<Map<string, NodePosition>>(new Map());
+  const prevGraphStructureKeyRef = useRef<string>('');
 
   const readOnly = !onAnnotationsChange;
 
@@ -157,29 +233,76 @@ export function useAnnotationSync({
     [readOnly, onTextChange, onDelete],
   );
 
-  const layoutKey = getLayoutKey(layoutedNodes);
+  const layoutKey = layoutKeyProp ?? getLayoutKey(layoutedNodes);
+  const graphStructureKey = getGraphStructureKey(layoutedNodes);
+  const graphSyncKey = layout === 'custom'
+    ? `${graphStructureKey}|${layoutKey}`
+    : layoutKey;
   const annotationsKey = getAnnotationsKey(annotations);
 
   useEffect(() => {
+    if (layout === 'custom') {
+      if (graphStructureKey !== prevGraphStructureKeyRef.current) {
+        prevGraphStructureKeyRef.current = graphStructureKey;
+        const layoutedIds = new Set(layoutedNodesRef.current.map((node) => node.id));
+        for (const id of lastAppliedPositionsRef.current.keys()) {
+          if (!layoutedIds.has(id)) {
+            lastAppliedPositionsRef.current.delete(id);
+          }
+        }
+      }
+
+      setNodes((current) => {
+        const layouted = layoutedNodesRef.current;
+        const graphNodes = current.some(isGraphNode)
+          ? mergeCustomGraphNodes(layouted, current, lastAppliedPositionsRef.current)
+          : layouted;
+
+        for (const node of graphNodes) {
+          lastAppliedPositionsRef.current.set(node.id, { ...node.position });
+        }
+
+        return mergeGraphAndAnnotationNodes(
+          graphNodes,
+          annotationsRef.current,
+          readOnly,
+        );
+      });
+      return;
+    }
+
+    lastAppliedPositionsRef.current = new Map();
+    prevGraphStructureKeyRef.current = '';
+
     setNodes(mergeGraphAndAnnotationNodes(
       layoutedNodesRef.current,
       annotationsRef.current,
       readOnly,
     ));
-  }, [layoutKey, annotationsKey, readOnly, setNodes]);
+  }, [graphSyncKey, annotationsKey, layout, graphStructureKey, readOnly, setNodes]);
 
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      if (!isAnnotationNode(node as FlowNode) || !onAnnotationsChange) return;
-      onAnnotationsChange(
-        (annotationsRef.current ?? []).map((annotation) => (
-          annotation.id === node.id
-            ? { ...annotation, position: { x: node.position.x, y: node.position.y } }
-            : annotation
-        )),
+      if (isAnnotationNode(node as FlowNode)) {
+        if (!onAnnotationsChange) return;
+        onAnnotationsChange(
+          (annotationsRef.current ?? []).map((annotation) => (
+            annotation.id === node.id
+              ? { ...annotation, position: { x: node.position.x, y: node.position.y } }
+              : annotation
+          )),
+        );
+        return;
+      }
+      const allPositions = getGraphNodePositions();
+      allPositions[node.id] = { x: node.position.x, y: node.position.y };
+      onGraphNodeDragStop?.(
+        node.id,
+        { x: node.position.x, y: node.position.y },
+        allPositions,
       );
     },
-    [onAnnotationsChange],
+    [onAnnotationsChange, onGraphNodeDragStop, getGraphNodePositions],
   );
 
   return { handleNodeDragStop, annotationActions };

@@ -1,10 +1,22 @@
-import { useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   useNodesState,
   useEdgesState,
   useReactFlow,
 } from '@xyflow/react';
-import type { FlowNode, FlowEdge, FlowGraphNode, GraphAnnotation, GraphFocusRequest, LayoutType } from '../../types';
+import type {
+  FlowNode,
+  FlowEdge,
+  FlowGraphNode,
+  GraphAnnotation,
+  GraphFocusRequest,
+  LayoutType,
+  NodePosition,
+  NodePositionMap,
+  FitViewPadding,
+} from '../../types';
+import { getLayoutKey } from '../../utils/annotationTransform';
+import { flowNodesToPositionMap } from '../../utils/positionMap';
 import { useGraphLayout } from '../../hooks/useGraphLayout';
 import {
   useLayoutSync,
@@ -17,9 +29,12 @@ interface UseGraphViewNodeStateOptions {
   initialNodes: FlowGraphNode[];
   initialEdges: FlowEdge[];
   layout?: LayoutType;
+  fitViewPadding?: FitViewPadding;
   elkWorkerUrl: string;
   annotations?: GraphAnnotation[];
   onAnnotationsChange?: (annotations: GraphAnnotation[]) => void;
+  onGraphNodeDragStop?: (nodeId: string, position: NodePosition, allPositions: NodePositionMap) => void;
+  onLayoutComplete?: (positions: NodePositionMap) => void;
   selectedIds?: string[];
   hoveredNodeId?: string | null;
   hoveredEdgeId?: string | null;
@@ -30,9 +45,12 @@ export function useGraphViewNodeState({
   initialNodes,
   initialEdges,
   layout = 'hierarchical',
+  fitViewPadding,
   elkWorkerUrl,
   annotations,
   onAnnotationsChange,
+  onGraphNodeDragStop,
+  onLayoutComplete,
   selectedIds,
   hoveredNodeId,
   hoveredEdgeId,
@@ -46,27 +64,44 @@ export function useGraphViewNodeState({
     edges: initialEdges,
     layout,
     elkWorkerUrl,
+    onLayoutComplete,
   });
+
+  const layoutKey = useMemo(() => getLayoutKey(layoutedNodes), [layoutedNodes]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
+  const getGraphNodePositions = useCallback(
+    () => flowNodesToPositionMap(nodesRef.current),
+    [],
+  );
+
+  const { handleNodeDragStop, annotationActions } = useAnnotationSync({
+    annotations,
+    layoutedNodes,
+    layoutKey,
+    layout,
+    setNodes,
+    onAnnotationsChange,
+    onGraphNodeDragStop,
+    getGraphNodePositions,
+  });
 
   useLayoutSync({
     layoutedNodes,
     layoutedEdges,
     isLayouting,
+    layoutKey,
+    layout,
+    fitViewPadding,
     setNodes,
     setEdges,
     fitView,
     focusRequest,
     consumedFocusTokenRef,
-  });
-
-  const { handleNodeDragStop, annotationActions } = useAnnotationSync({
-    annotations,
-    layoutedNodes,
-    setNodes,
-    onAnnotationsChange,
   });
 
   useControlledSelection(selectedIds, setNodes, setEdges);
@@ -76,6 +111,7 @@ export function useGraphViewNodeState({
     isLayouting,
     nodes,
     edges,
+    layoutKey,
     onNodesChange,
     onEdgesChange,
     handleNodeDragStop,

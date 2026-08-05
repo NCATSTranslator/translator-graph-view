@@ -7,6 +7,7 @@ import type {
   GraphNodeData,
   GraphEdgeData,
   EdgeType,
+  NodePositionMap,
 } from '../types';
 import { getColorForType, simplifyTypeName, getPrimaryType } from './colorGenerator';
 
@@ -17,7 +18,10 @@ export const NODE_HEIGHT = 60;
 /**
  * Convert GraphData to ReactFlow nodes
  */
-export function transformNodesToFlow(data: GraphData): FlowGraphNode[] {
+export function transformNodesToFlow(
+  data: GraphData,
+  nodePositions?: NodePositionMap,
+): FlowGraphNode[] {
   return Object.values(data.nodes).map((node) => {
     const primaryType = getPrimaryType(node.types);
     const color = getColorForType(primaryType);
@@ -33,7 +37,7 @@ export function transformNodesToFlow(data: GraphData): FlowGraphNode[] {
     return {
       id: node.id,
       type: 'graphNode',
-      position: { x: 0, y: 0 }, // Will be set by layout
+      position: nodePositions?.[node.id] ?? { x: 0, y: 0 },
       data: nodeData,
     };
   });

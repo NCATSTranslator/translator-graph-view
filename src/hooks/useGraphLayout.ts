@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ELK from 'elkjs/lib/elk-api.js';
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs';
-import type { FlowGraphNode, FlowEdge, LayoutType } from '../types';
+import type { FlowGraphNode, FlowEdge, LayoutType, NodePositionMap } from '../types';
 import { getLayoutOptions } from '../layouts';
 import { NODE_WIDTH, NODE_HEIGHT } from '../utils';
+import { flowGraphNodesToPositionMap } from '../utils/positionMap';
 
 interface UseGraphLayoutOptions {
   nodes: FlowGraphNode[];
   edges: FlowEdge[];
   layout: LayoutType;
   elkWorkerUrl: string;
+  onLayoutComplete?: (positions: NodePositionMap) => void;
 }
 
 interface UseGraphLayoutResult {
@@ -64,8 +66,11 @@ export function useGraphLayout({
   edges,
   layout,
   elkWorkerUrl,
+  onLayoutComplete,
 }: UseGraphLayoutOptions): UseGraphLayoutResult {
   const elk = useMemo(() => new ELK({ workerUrl: elkWorkerUrl }), [elkWorkerUrl]);
+  const onLayoutCompleteRef = useRef(onLayoutComplete);
+  onLayoutCompleteRef.current = onLayoutComplete;
 
   const [layoutedNodes, setLayoutedNodes] = useState<FlowGraphNode[]>(nodes);
   const [layoutedEdges, setLayoutedEdges] = useState<FlowEdge[]>(edges);
@@ -78,14 +83,24 @@ export function useGraphLayout({
       return;
     }
 
+    if (layout === 'custom') {
+      setLayoutedNodes(nodes);
+      setLayoutedEdges(edges);
+      setIsLayouting(false);
+      onLayoutCompleteRef.current?.(flowGraphNodesToPositionMap(nodes));
+      return;
+    }
+
     setIsLayouting(true);
 
     try {
       const layoutedGraph = await elk.layout(buildElkGraph(nodes, edges, layout));
       if (cancelled()) return;
       if (layoutedGraph.children) {
-        setLayoutedNodes(applyElkPositions(nodes, layoutedGraph));
+        const positioned = applyElkPositions(nodes, layoutedGraph);
+        setLayoutedNodes(positioned);
         setLayoutedEdges(edges);
+        onLayoutCompleteRef.current?.(flowGraphNodesToPositionMap(positioned));
       }
     } catch (error) {
       if (cancelled()) return;

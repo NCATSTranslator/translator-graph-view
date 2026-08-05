@@ -66,8 +66,12 @@ function getLayoutKey(nodes: FlowGraphNode[]): string {
   return nodes.map((n) => `${n.id}:${n.position.x},${n.position.y}`).join('|');
 }
 
+function getGraphStructureKey(nodes: FlowGraphNode[]): string {
+  return nodes.map((n) => n.id).sort().join('|');
+}
+
 function getAnnotationsKey(annotations: GraphAnnotation[] | undefined): string {
   return JSON.stringify(annotations ?? []);
 }
 
-export { getLayoutKey, getAnnotationsKey };
+export { getLayoutKey, getGraphStructureKey, getAnnotationsKey };
