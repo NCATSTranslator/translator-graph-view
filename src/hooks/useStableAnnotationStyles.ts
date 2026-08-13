@@ -1,12 +1,7 @@
-import { useRef } from 'react';
 import type { GraphAnnotationStyles } from '../types';
+import { useStableValue } from './useStableValue';
 
-function annotationStylesEqual(
-  a: GraphAnnotationStyles | undefined,
-  b: GraphAnnotationStyles | undefined,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return !a && !b;
+function annotationStylesEqual(a: GraphAnnotationStyles, b: GraphAnnotationStyles): boolean {
   return a.backgroundColor === b.backgroundColor
     && a.className === b.className
     && a.deleteButton?.backgroundColor === b.deleteButton?.backgroundColor
@@ -18,9 +13,5 @@ function annotationStylesEqual(
 export function useStableAnnotationStyles(
   styles: GraphAnnotationStyles | undefined,
 ): GraphAnnotationStyles | undefined {
-  const ref = useRef(styles);
-  if (!annotationStylesEqual(ref.current, styles)) {
-    ref.current = styles;
-  }
-  return ref.current;
+  return useStableValue(styles, annotationStylesEqual);
 }
