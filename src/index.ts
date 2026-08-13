@@ -7,7 +7,7 @@ export { GraphAnnotationNode } from './components/annotations';
 // Hooks
 export { useGraphLayout } from './hooks/useGraphLayout';
 export { useSelection } from './hooks/useSelection';
-export { useGraphSettings, GraphSettingsContext } from './hooks/useGraphSettings';
+export { useGraphSettings, GraphSettingsContext, DEFAULT_DIMMED_OPACITY } from './hooks/useGraphSettings';
 export type { GraphSettings } from './hooks/useGraphSettings';
 
 // Layouts
@@ -56,7 +56,11 @@ export type {
   GraphFocusRequest,
   GraphAnnotation,
   GraphAnnotationStyles,
+  GraphHoverStyles,
   NodePosition,
   NodePositionMap,
   FitViewPadding,
 } from './types';
+
+export { computeHoverFocus } from './utils/hoverFocus';
+export type { HoverFocusIds, HoverFocusSets, HoverFocusEdge } from './utils/hoverFocus';
