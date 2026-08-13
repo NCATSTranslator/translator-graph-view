@@ -12,7 +12,7 @@
   border-radius: 4px;
   box-shadow: none;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   svg {
     width: 24px;
     height: 24px;
@@ -23,6 +23,12 @@
 
   &.hovered {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  &.dimmed {
+    // --tgv-dimmed-opacity is set on the graph surface (DEFAULT_DIMMED_OPACITY).
+    opacity: var(--tgv-dimmed-opacity);
+    pointer-events: none;
   }
 
   &.selected {

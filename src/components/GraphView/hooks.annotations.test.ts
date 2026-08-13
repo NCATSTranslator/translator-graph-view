@@ -80,7 +80,27 @@ describe('useLayoutSync', () => {
     const updateNodes = setNodes.mock.calls[0][0] as (current: FlowNode[]) => FlowNode[];
     expect(updateNodes([])).toEqual(layoutedGraph);
     expect(updateNodes([annotationNode])).toEqual([...layoutedGraph, annotationNode]);
-    expect(setEdges).toHaveBeenCalledWith([]);
+
+    const hoveredGraphNode: FlowNode = {
+      ...graphNode,
+      data: { ...graphNode.data, hovered: true, dimmed: false },
+    };
+    const dimmedAnnotation = {
+      ...annotationNode,
+      data: { ...annotationNode.data, dimmed: true },
+    } as FlowNode;
+    const restored = updateNodes([hoveredGraphNode, dimmedAnnotation]);
+    expect(restored.find((node) => node.id === 'a')?.data).toMatchObject({
+      hovered: true,
+      dimmed: false,
+    });
+    expect(restored.find((node) => node.id === 'ann-1')?.data).toMatchObject({
+      dimmed: true,
+    });
+
+    expect(setEdges).toHaveBeenCalledTimes(1);
+    const updateEdges = setEdges.mock.calls[0][0] as (current: unknown[]) => unknown[];
+    expect(updateEdges([])).toEqual([]);
     vi.advanceTimersByTime(50);
     expect(fitView).toHaveBeenCalledWith({ padding: 0.1, duration: 200 });
     vi.useRealTimers();
@@ -211,7 +231,9 @@ describe('useLayoutSync', () => {
     }));
 
     expect(setNodes).not.toHaveBeenCalled();
-    expect(setEdges).toHaveBeenCalledWith([]);
+    expect(setEdges).toHaveBeenCalledTimes(1);
+    const updateEdges = setEdges.mock.calls[0][0] as (current: unknown[]) => unknown[];
+    expect(updateEdges([])).toEqual([]);
     expect(fitView).not.toHaveBeenCalled();
   });
 });
@@ -228,7 +250,9 @@ describe('useAnnotationSync merge', () => {
       getGraphNodePositions: defaultGraphNodePositions,
     }));
 
-    expect(setNodes).toHaveBeenCalledWith(
+    expect(setNodes).toHaveBeenCalledTimes(1);
+    const updateNodes = setNodes.mock.calls[0][0] as (current: FlowNode[]) => FlowNode[];
+    expect(updateNodes([])).toEqual(
       mergeGraphAndAnnotationNodes(layoutedGraph, annotations, false),
     );
   });
@@ -275,10 +299,12 @@ describe('useAnnotationSync merge', () => {
     setNodes.mockClear();
     rerender({ layoutedNodes: layoutedB });
 
-    expect(setNodes).toHaveBeenCalledWith(
+    expect(setNodes).toHaveBeenCalledTimes(1);
+    const updateNodes = setNodes.mock.calls[0][0] as (current: FlowNode[]) => FlowNode[];
+    const merged = updateNodes([]);
+    expect(merged).toEqual(
       mergeGraphAndAnnotationNodes(layoutedB, annotations, true),
     );
-    const merged = setNodes.mock.calls[0][0] as ReturnType<typeof mergeGraphAndAnnotationNodes>;
     const annotationNode = merged.find((node) => node.id === 'ann-1');
     expect(annotationNode?.draggable).toBe(false);
   });

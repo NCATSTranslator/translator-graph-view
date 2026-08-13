@@ -34,7 +34,7 @@ function syncTextareaHeight(textarea: HTMLTextAreaElement): void {
 
 function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
   const nodeData = data as GraphAnnotationData;
-  const { annotationStyles } = useGraphSettings();
+  const { annotationStyles, hoverStyles } = useGraphSettings();
   const { onTextChange, onDelete, readOnly } = useAnnotationActions();
   const [text, setText] = useState(nodeData.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -79,7 +79,14 @@ function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
 
   return (
     <div
-      className={cn(styles.annotation, annotationStyles?.className)}
+      className={cn(
+        styles.annotation,
+        annotationStyles?.className,
+        nodeData.hovered && styles.hovered,
+        nodeData.dimmed && styles.dimmed,
+        nodeData.hovered && hoverStyles?.hoveredAnnotationClassName,
+        nodeData.dimmed && hoverStyles?.dimmedAnnotationClassName,
+      )}
       style={containerStyle}
     >
       {!readOnly && (

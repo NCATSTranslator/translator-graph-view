@@ -21,3 +21,6 @@ export {
   extractAnnotationsFromFlow,
   isAnnotationNode,
 } from './annotationTransform';
+
+export { computeHoverFocus } from './hoverFocus';
+export type { HoverFocusIds, HoverFocusSets, HoverFocusEdge } from './hoverFocus';

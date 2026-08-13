@@ -16,7 +16,10 @@ import type { GraphViewProps, FlowEdge, FlowGraphNode } from '../../types';
 import { transformNodesToFlow, transformEdgesToFlow } from '../../utils';
 import { ANNOTATION_NODE_TYPE } from '../../utils/annotationTransform';
 import { cn } from '../../utils/cn';
-import { GraphSettingsContext } from '../../hooks/useGraphSettings';
+import {
+  GraphSettingsContext,
+  DEFAULT_DIMMED_OPACITY,
+} from '../../hooks/useGraphSettings';
 import { AnnotationActionsContext } from '../../hooks/useAnnotationActions';
 import { GraphNode } from '../nodes';
 import { GraphEdge } from '../edges';
@@ -87,6 +90,13 @@ function GraphViewInner(props: GraphViewInnerProps) {
     [fitViewPadding],
   );
 
+  const surfaceStyle = useMemo(() => {
+    const opacity = settings.hoverStyles?.dimmedOpacity ?? DEFAULT_DIMMED_OPACITY;
+    return {
+      '--tgv-dimmed-opacity': String(opacity),
+    } as React.CSSProperties;
+  }, [settings.hoverStyles?.dimmedOpacity]);
+
   if (isLayouting) {
     return <div className={styles.loading}>Computing layout...</div>;
   }
@@ -94,7 +104,11 @@ function GraphViewInner(props: GraphViewInnerProps) {
   return (
     <AnnotationActionsContext.Provider value={annotationActions}>
       <GraphSettingsContext.Provider value={settings}>
-        <div ref={graphSurfaceRef} className={styles.graphSurface}>
+        <div
+          ref={graphSurfaceRef}
+          className={styles.graphSurface}
+          style={surfaceStyle}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}

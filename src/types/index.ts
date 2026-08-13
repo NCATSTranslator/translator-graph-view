@@ -96,6 +96,7 @@ export interface GraphNodeData extends Record<string, unknown> {
   color: string;
   selected?: boolean;
   hovered?: boolean;
+  dimmed?: boolean;
 }
 
 export interface GraphEdgeData extends Record<string, unknown> {
@@ -108,6 +109,7 @@ export interface GraphEdgeData extends Record<string, unknown> {
   edgeIndex?: number;
   edgeTotalCount?: number;
   hovered?: boolean;
+  dimmed?: boolean;
 }
 
 // Annotation types
@@ -127,9 +129,29 @@ export interface GraphAnnotationStyles {
   };
 }
 
+/** Client-configurable hover / dim appearance. Built-in styles remain as defaults. */
+export interface GraphHoverStyles {
+  /** Opacity applied to dimmed nodes/edges/annotations. Default: 0.3 */
+  dimmedOpacity?: number;
+  /** Extra class on dimmed nodes */
+  dimmedNodeClassName?: string;
+  /** Extra class on dimmed edges */
+  dimmedEdgeClassName?: string;
+  /** Extra class on dimmed annotations */
+  dimmedAnnotationClassName?: string;
+  /** Extra class on hovered nodes (in addition to built-in) */
+  hoveredNodeClassName?: string;
+  /** Extra class on hovered edges */
+  hoveredEdgeClassName?: string;
+  /** Extra class on hovered annotations */
+  hoveredAnnotationClassName?: string;
+}
+
 export interface GraphAnnotationData extends Record<string, unknown> {
   text: string;
   annotation: GraphAnnotation;
+  hovered?: boolean;
+  dimmed?: boolean;
 }
 
 // ReactFlow typed nodes and edges
@@ -184,8 +206,11 @@ export interface GraphViewProps {
   onEdgeClick?: (edge: GraphEdge) => void;
   onNodeHover?: (node: GraphNode | null, geometry: HoverGeometry | null) => void;
   onEdgeHover?: (edge: GraphEdge | null, geometry: HoverGeometry | null) => void;
+  /** Fires when an annotation is hovered or unhovered. */
+  onAnnotationHover?: (annotationId: string | null) => void;
   hoveredNodeId?: string | null;
   hoveredEdgeId?: string | null;
+  hoveredAnnotationId?: string | null;
   nodeHoverAnchor?: HoverAnchorPosition;
   edgeHoverAnchor?: HoverAnchorPosition;
   selectedIds?: string[];
@@ -198,6 +223,8 @@ export interface GraphViewProps {
   onAnnotationsChange?: (annotations: GraphAnnotation[]) => void;
   /** Client-configurable annotation appearance. */
   annotationStyles?: GraphAnnotationStyles;
+  /** Client-configurable hover / dim appearance. */
+  hoverStyles?: GraphHoverStyles;
   /** Show the zoomable/pannable minimap. */
   showMiniMap?: boolean;
   className?: string;

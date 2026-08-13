@@ -84,6 +84,7 @@ interface ResolvedEdgeProps {
   edgeTotalCount?: number;
   label: string;
   hovered: boolean;
+  dimmed: boolean;
   predicate?: string;
 }
 
@@ -96,6 +97,7 @@ function resolveEdgeDataProps(data: GraphEdgeData | undefined): ResolvedEdgeProp
     showLabel = true,
     label: rawLabel = '',
     hovered = false,
+    dimmed = false,
     graphEdge,
   } = data ?? {};
   return {
@@ -105,6 +107,7 @@ function resolveEdgeDataProps(data: GraphEdgeData | undefined): ResolvedEdgeProp
     edgeTotalCount,
     label: showLabel ? rawLabel : '',
     hovered,
+    dimmed,
     predicate: graphEdge?.predicate,
   };
 }
@@ -114,11 +117,17 @@ function buildEdgePathClassName(
   selected: boolean,
   inferred: boolean,
   hovered: boolean,
+  dimmed: boolean,
+  extraHoveredClassName?: string,
+  extraDimmedClassName?: string,
 ): string {
   const classes = [styles.edgePath];
   if (selected) classes.push(styles.selected);
   if (inferred) classes.push(styles.inferred);
   if (hovered) classes.push(styles.hovered);
+  if (dimmed) classes.push(styles.dimmed);
+  if (hovered && extraHoveredClassName) classes.push(extraHoveredClassName);
+  if (dimmed && extraDimmedClassName) classes.push(extraDimmedClassName);
   return classes.join(' ');
 }
 
@@ -134,11 +143,11 @@ function GraphEdgeComponent({
   selected,
   markerEnd,
 }: EdgeProps) {
-  const { multiEdgeSpacing } = useGraphSettings();
+  const { multiEdgeSpacing, hoverStyles } = useGraphSettings();
   const edgeData = data as GraphEdgeData | undefined;
   const {
     edgeType, inferred, edgeIndex, edgeTotalCount,
-    label, hovered, predicate,
+    label, hovered, dimmed, predicate,
   } = resolveEdgeDataProps(edgeData);
 
   const [edgePath, labelX, labelY] = useMemo(() => {
@@ -167,7 +176,15 @@ function GraphEdgeComponent({
     targetX, targetY, targetPosition,
   ]);
 
-  const pathClassName = buildEdgePathClassName(styles, !!selected, inferred, hovered);
+  const pathClassName = buildEdgePathClassName(
+    styles,
+    !!selected,
+    inferred,
+    hovered,
+    dimmed,
+    hoverStyles?.hoveredEdgeClassName,
+    hoverStyles?.dimmedEdgeClassName,
+  );
 
   return (
     <>
@@ -187,7 +204,7 @@ function GraphEdgeComponent({
             className={`nodrag nopan ${styles.edgeLabelContainer}`}
           >
             <div
-              className={`${styles.edgeLabel} ${selected ? styles.selected : ''}`}
+              className={`${styles.edgeLabel} ${selected ? styles.selected : ''} ${dimmed ? styles.dimmed : ''}`}
               title={predicate}
             >
               {label}
