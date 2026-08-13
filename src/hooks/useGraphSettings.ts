@@ -1,10 +1,13 @@
 import { createContext, useContext } from 'react';
 
-import type { GraphAnnotationStyles } from '../types';
+import type { GraphAnnotationStyles, GraphHoverStyles } from '../types';
+
+export const DEFAULT_DIMMED_OPACITY = 0.3;
 
 export interface GraphSettings {
   multiEdgeSpacing: number;
   annotationStyles?: GraphAnnotationStyles;
+  hoverStyles?: GraphHoverStyles;
 }
 
 const defaults: GraphSettings = {
