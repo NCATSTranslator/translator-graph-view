@@ -11,6 +11,7 @@ import type {
   GraphEdge,
   GraphNodeData,
   GraphEdgeData,
+  GraphAnnotationData,
   GraphAnnotation,
   GraphFocusRequest,
   HoverAnchorPosition,
@@ -31,6 +32,7 @@ import {
   getAnnotationsKey,
 } from '../../utils/annotationTransform';
 import { measureNodeGeometry, measureEdgeGeometry } from '../../utils/hoverGeometry';
+import { computeHoverFocus } from '../../utils/hoverFocus';
 import { getFitViewPaddingKey } from '../../utils/positionMap';
 import {
   DEFAULT_FIT_VIEW_PADDING,
@@ -41,6 +43,32 @@ export { DEFAULT_FIT_VIEW_PADDING, FIT_VIEW_DURATION_MS } from './constants';
 
 type SetNodes = Dispatch<SetStateAction<FlowNode[]>>;
 type SetEdges = Dispatch<SetStateAction<FlowEdge[]>>;
+
+type HoverDimmedData = { hovered?: boolean; dimmed?: boolean };
+
+/** Copy hovered/dimmed flags from previous items onto the next layout/props snapshot. */
+function restoreHoverDimmedData<T extends { id: string; data?: HoverDimmedData }>(
+  next: T[],
+  prev: T[],
+): T[] {
+  if (prev.length === 0) return next;
+  const prevById = new Map(prev.map((item) => [item.id, item]));
+  let changed = false;
+  const restored = next.map((item) => {
+    const previous = prevById.get(item.id);
+    if (!previous?.data) return item;
+    const hovered = previous.data.hovered;
+    const dimmed = previous.data.dimmed;
+    if (hovered === undefined && dimmed === undefined) return item;
+    if (item.data?.hovered === hovered && item.data?.dimmed === dimmed) return item;
+    changed = true;
+    return {
+      ...item,
+      data: { ...item.data, hovered, dimmed },
+    };
+  });
+  return changed ? restored : next;
+}
 
 /** True when a focus request has a token that has not yet been consumed. */
 export function hasPendingFocusRequest(
@@ -95,18 +123,21 @@ export function useLayoutSync({
     if (isLayouting || layoutedNodes.length === 0) return;
 
     if (layout === 'custom') {
-      setEdges(layoutedEdges);
+      setEdges((current) => restoreHoverDimmedData(layoutedEdges, current));
       return;
     }
 
     // Preserve annotation nodes already on the canvas. useAnnotationSync owns
     // merging from props, but layout sync can re-run when fitView identity
     // changes and must not wipe annotations added since the last layout pass.
+    // Also restore hovered/dimmed so controlled hover survives layout writes;
+    // useControlledHover re-applies authoritative focus after sync.
     setNodes((current) => {
       const annotationNodes = current.filter(isAnnotationNode);
-      return [...layoutedNodes, ...annotationNodes];
+      const graphNodes = restoreHoverDimmedData(layoutedNodes, current.filter(isGraphNode));
+      return [...graphNodes, ...annotationNodes];
     });
-    setEdges(layoutedEdges);
+    setEdges((current) => restoreHoverDimmedData(layoutedEdges, current));
 
     const fitViewSyncKey = `${layoutKey}|${getFitViewPaddingKey(fitViewPadding)}`;
     const shouldFitView = prevFitViewSyncKeyRef.current !== fitViewSyncKey;
@@ -141,6 +172,12 @@ function mergeCustomGraphNodes(
     const userMoved = lastApplied !== undefined
       && (existing.position.x !== lastApplied.x || existing.position.y !== lastApplied.y);
 
+    const existingData = existing.data as GraphNodeData;
+    const hoverData = {
+      hovered: existingData.hovered,
+      dimmed: existingData.dimmed,
+    };
+
     if (userMoved) {
       return {
         ...layoutNode,
@@ -149,12 +186,22 @@ function mergeCustomGraphNodes(
         data: {
           ...layoutNode.data,
           selected: layoutNode.data.selected,
-          hovered: layoutNode.data.hovered,
+          ...hoverData,
         },
       };
     }
 
-    return layoutNode;
+    if (hoverData.hovered === undefined && hoverData.dimmed === undefined) {
+      return layoutNode;
+    }
+
+    return {
+      ...layoutNode,
+      data: {
+        ...layoutNode.data,
+        ...hoverData,
+      },
+    };
   });
 }
 
@@ -262,11 +309,12 @@ export function useAnnotationSync({
           lastAppliedPositionsRef.current.set(node.id, { ...node.position });
         }
 
-        return mergeGraphAndAnnotationNodes(
+        const merged = mergeGraphAndAnnotationNodes(
           graphNodes,
           annotationsRef.current,
           readOnly,
         );
+        return restoreHoverDimmedData(merged, current);
       });
       return;
     }
@@ -274,10 +322,13 @@ export function useAnnotationSync({
     lastAppliedPositionsRef.current = new Map();
     prevGraphStructureKeyRef.current = '';
 
-    setNodes(mergeGraphAndAnnotationNodes(
-      layoutedNodesRef.current,
-      annotationsRef.current,
-      readOnly,
+    setNodes((current) => restoreHoverDimmedData(
+      mergeGraphAndAnnotationNodes(
+        layoutedNodesRef.current,
+        annotationsRef.current,
+        readOnly,
+      ),
+      current,
     ));
   }, [graphSyncKey, annotationsKey, layout, graphStructureKey, readOnly, setNodes]);
 
@@ -401,45 +452,84 @@ export function useFocusNode(
 }
 
 /**
- * Flip the `hovered` flag on the single node/edge whose hover state changed.
+ * Apply neighborhood hover focus: hovered flags plus dimming of non-focused elements.
+ * Preference when multiple ids are set: annotation > node > edge.
  */
 export function useControlledHover(
   hoveredNodeId: string | null | undefined,
   hoveredEdgeId: string | null | undefined,
+  hoveredAnnotationId: string | null | undefined,
+  edges: FlowEdge[],
   setNodes: SetNodes,
   setEdges: SetEdges,
+  /** Re-apply after layout sync replaces nodes/edges. */
+  layoutKey?: string,
+  /** Re-apply after annotation sync rebuilds annotation nodes. */
+  annotationsKey?: string,
 ): void {
-  const prevNodeRef = useRef<string | null | undefined>(undefined);
-  const prevEdgeRef = useRef<string | null | undefined>(undefined);
+  const edgesRef = useRef(edges);
+  edgesRef.current = edges;
+  const edgeStructureKey = useMemo(
+    () => edges.map((edge) => `${edge.id}:${edge.source}:${edge.target}`).join('|'),
+    [edges],
+  );
 
   useEffect(() => {
-    const prev = prevNodeRef.current;
-    if (prev === hoveredNodeId) return;
-    prevNodeRef.current = hoveredNodeId;
+    const focusSets = computeHoverFocus(
+      edgesRef.current.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+      })),
+      { hoveredNodeId, hoveredEdgeId, hoveredAnnotationId },
+    );
+
     setNodes((nds) =>
       nds.map((node) => {
-        if (isAnnotationNode(node)) return node;
-        const shouldHover = node.id === hoveredNodeId;
-        const wasHovered = node.id === prev;
-        if (!shouldHover && !wasHovered) return node;
-        return { ...node, data: { ...node.data, hovered: shouldHover } as GraphNodeData };
+        if (isAnnotationNode(node)) {
+          const hovered = focusSets.hoveredAnnotationIds.has(node.id);
+          const dimmed = focusSets.isDimming;
+          const data = node.data as GraphAnnotationData;
+          if (data.hovered === hovered && data.dimmed === dimmed) return node;
+          return {
+            ...node,
+            data: { ...data, hovered, dimmed } as GraphAnnotationData,
+          };
+        }
+
+        const hovered = focusSets.hoveredNodeIds.has(node.id);
+        const dimmed = focusSets.isDimming && !focusSets.focusedNodeIds.has(node.id);
+        const data = node.data as GraphNodeData;
+        if (data.hovered === hovered && data.dimmed === dimmed) return node;
+        return {
+          ...node,
+          data: { ...data, hovered, dimmed } as GraphNodeData,
+        };
       }),
     );
-  }, [hoveredNodeId, setNodes]);
 
-  useEffect(() => {
-    const prev = prevEdgeRef.current;
-    if (prev === hoveredEdgeId) return;
-    prevEdgeRef.current = hoveredEdgeId;
     setEdges((eds) =>
       eds.map((edge) => {
-        const shouldHover = edge.id === hoveredEdgeId;
-        const wasHovered = edge.id === prev;
-        if (!shouldHover && !wasHovered) return edge;
-        return { ...edge, data: { ...edge.data, hovered: shouldHover } as GraphEdgeData };
+        const hovered = focusSets.hoveredEdgeIds.has(edge.id);
+        const dimmed = focusSets.isDimming && !focusSets.focusedEdgeIds.has(edge.id);
+        const data = edge.data as GraphEdgeData | undefined;
+        if (data?.hovered === hovered && data?.dimmed === dimmed) return edge;
+        return {
+          ...edge,
+          data: { ...data, hovered, dimmed } as GraphEdgeData,
+        };
       }),
     );
-  }, [hoveredEdgeId, setEdges]);
+  }, [
+    hoveredNodeId,
+    hoveredEdgeId,
+    hoveredAnnotationId,
+    edgeStructureKey,
+    layoutKey,
+    annotationsKey,
+    setNodes,
+    setEdges,
+  ]);
 }
 
 export interface UseHoverGeometryOptions {
@@ -448,6 +538,7 @@ export interface UseHoverGeometryOptions {
   edgeHoverAnchor: HoverAnchorPosition;
   onNodeHover?: (node: GraphNode | null, geometry: HoverGeometry | null) => void;
   onEdgeHover?: (edge: GraphEdge | null, geometry: HoverGeometry | null) => void;
+  onAnnotationHover?: (annotationId: string | null) => void;
   surfaceRef: React.RefObject<HTMLElement | null>;
 }
 
@@ -459,12 +550,17 @@ export interface HoverGeometryHandlers {
   scheduleFlush: () => void;
 }
 
-type HoverTarget = { kind: 'node'; id: string } | { kind: 'edge'; id: string } | null;
+type HoverTarget =
+  | { kind: 'node'; id: string }
+  | { kind: 'edge'; id: string }
+  | { kind: 'annotation'; id: string }
+  | null;
 
 interface HoverRefs {
   data: React.MutableRefObject<GraphData>;
   onNodeHover: React.MutableRefObject<UseHoverGeometryOptions['onNodeHover']>;
   onEdgeHover: React.MutableRefObject<UseHoverGeometryOptions['onEdgeHover']>;
+  onAnnotationHover: React.MutableRefObject<UseHoverGeometryOptions['onAnnotationHover']>;
   nodeAnchor: React.MutableRefObject<HoverAnchorPosition>;
   edgeAnchor: React.MutableRefObject<HoverAnchorPosition>;
   hoverTarget: React.MutableRefObject<HoverTarget>;
@@ -478,13 +574,24 @@ function useLiveHoverRefs(opts: UseHoverGeometryOptions): HoverRefs {
   onNodeHover.current = opts.onNodeHover;
   const onEdgeHover = useRef(opts.onEdgeHover);
   onEdgeHover.current = opts.onEdgeHover;
+  const onAnnotationHover = useRef(opts.onAnnotationHover);
+  onAnnotationHover.current = opts.onAnnotationHover;
   const nodeAnchor = useRef(opts.nodeHoverAnchor);
   nodeAnchor.current = opts.nodeHoverAnchor;
   const edgeAnchor = useRef(opts.edgeHoverAnchor);
   edgeAnchor.current = opts.edgeHoverAnchor;
   const hoverTarget = useRef<HoverTarget>(null);
   const raf = useRef<number | null>(null);
-  return { data, onNodeHover, onEdgeHover, nodeAnchor, edgeAnchor, hoverTarget, raf };
+  return {
+    data,
+    onNodeHover,
+    onEdgeHover,
+    onAnnotationHover,
+    nodeAnchor,
+    edgeAnchor,
+    hoverTarget,
+    raf,
+  };
 }
 
 function measureTarget(
@@ -492,6 +599,7 @@ function measureTarget(
   refs: HoverRefs,
   root: Element,
 ): void {
+  if (target.kind === 'annotation') return;
   if (target.kind === 'node') {
     const cb = refs.onNodeHover.current;
     if (!cb) return;
@@ -508,12 +616,18 @@ function measureTarget(
 }
 
 /**
- * Tracks the currently hovered node/edge and re-measures its geometry on
- * viewport changes via rAF, invoking `onNodeHover`/`onEdgeHover` with the
- * updated anchor point.
+ * Tracks the currently hovered node/edge/annotation and re-measures geometry on
+ * viewport changes via rAF, invoking hover callbacks with the updated anchor.
  */
 export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHandlers {
-  const { nodeHoverAnchor, edgeHoverAnchor, onNodeHover, onEdgeHover, surfaceRef } = opts;
+  const {
+    nodeHoverAnchor,
+    edgeHoverAnchor,
+    onNodeHover,
+    onEdgeHover,
+    onAnnotationHover,
+    surfaceRef,
+  } = opts;
   const refs = useLiveHoverRefs(opts);
 
   const cancelFlush = useCallback(() => {
@@ -525,7 +639,7 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
 
   const scheduleFlush = useCallback(() => {
     const target = refs.hoverTarget.current;
-    if (!target || refs.raf.current !== null) return;
+    if (!target || target.kind === 'annotation' || refs.raf.current !== null) return;
     refs.raf.current = requestAnimationFrame(() => {
       refs.raf.current = null;
       const root = surfaceRef.current;
@@ -537,20 +651,31 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
 
   const handleNodeMouseEnter = useCallback(
     (_e: React.MouseEvent, node: Node) => {
-      if (!onNodeHover || isAnnotationNode(node as FlowNode)) return;
+      if (isAnnotationNode(node as FlowNode)) {
+        if (!onAnnotationHover) return;
+        refs.hoverTarget.current = { kind: 'annotation', id: node.id };
+        onAnnotationHover(node.id);
+        return;
+      }
+      if (!onNodeHover) return;
       const graphNode = refs.data.current.nodes[node.id];
       if (!graphNode) return;
       refs.hoverTarget.current = { kind: 'node', id: node.id };
       onNodeHover(graphNode, measureNodeGeometry(node.id, nodeHoverAnchor, surfaceRef.current));
     },
-    [onNodeHover, nodeHoverAnchor, surfaceRef, refs],
+    [onNodeHover, onAnnotationHover, nodeHoverAnchor, surfaceRef, refs],
   );
 
   const handleNodeMouseLeave = useCallback(() => {
     cancelFlush();
+    const prev = refs.hoverTarget.current;
     refs.hoverTarget.current = null;
+    if (prev?.kind === 'annotation') {
+      if (onAnnotationHover) onAnnotationHover(null);
+      return;
+    }
     if (onNodeHover) onNodeHover(null, null);
-  }, [onNodeHover, cancelFlush, refs]);
+  }, [onNodeHover, onAnnotationHover, cancelFlush, refs]);
 
   const handleEdgeMouseEnter = useCallback(
     (_e: React.MouseEvent, edge: Edge) => {

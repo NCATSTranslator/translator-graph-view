@@ -15,7 +15,7 @@ import type {
   NodePositionMap,
   FitViewPadding,
 } from '../../types';
-import { getLayoutKey } from '../../utils/annotationTransform';
+import { getLayoutKey, getAnnotationsKey } from '../../utils/annotationTransform';
 import { flowNodesToPositionMap } from '../../utils/positionMap';
 import { useGraphLayout } from '../../hooks/useGraphLayout';
 import {
@@ -38,6 +38,7 @@ interface UseGraphViewNodeStateOptions {
   selectedIds?: string[];
   hoveredNodeId?: string | null;
   hoveredEdgeId?: string | null;
+  hoveredAnnotationId?: string | null;
   focusRequest?: GraphFocusRequest | null;
 }
 
@@ -54,6 +55,7 @@ export function useGraphViewNodeState({
   selectedIds,
   hoveredNodeId,
   hoveredEdgeId,
+  hoveredAnnotationId,
   focusRequest,
 }: UseGraphViewNodeStateOptions) {
   const { fitView } = useReactFlow();
@@ -68,6 +70,7 @@ export function useGraphViewNodeState({
   });
 
   const layoutKey = useMemo(() => getLayoutKey(layoutedNodes), [layoutedNodes]);
+  const annotationsKey = useMemo(() => getAnnotationsKey(annotations), [annotations]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
@@ -105,7 +108,16 @@ export function useGraphViewNodeState({
   });
 
   useControlledSelection(selectedIds, setNodes, setEdges);
-  useControlledHover(hoveredNodeId, hoveredEdgeId, setNodes, setEdges);
+  useControlledHover(
+    hoveredNodeId,
+    hoveredEdgeId,
+    hoveredAnnotationId,
+    edges,
+    setNodes,
+    setEdges,
+    layoutKey,
+    annotationsKey,
+  );
 
   return {
     isLayouting,
