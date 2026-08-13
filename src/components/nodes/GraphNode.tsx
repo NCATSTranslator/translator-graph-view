@@ -3,10 +3,12 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { GraphNodeData } from '../../types';
 import { capitalizeAllWords, getNodeTypeIcon } from '../../utils/utils';
 import { cn } from '../../utils/cn';
+import { useGraphSettings } from '../../hooks/useGraphSettings';
 import styles from './GraphNode.module.scss';
 
 function GraphNodeComponent({ data, selected }: NodeProps) {
   const nodeData = data as GraphNodeData;
+  const { hoverStyles } = useGraphSettings();
   const nodeStyle = {
     '--node-color': nodeData.color,
   } as React.CSSProperties;
@@ -20,6 +22,9 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
     styles.node,
     selected && styles.selected,
     nodeData.hovered && styles.hovered,
+    nodeData.dimmed && styles.dimmed,
+    nodeData.hovered && hoverStyles?.hoveredNodeClassName,
+    nodeData.dimmed && hoverStyles?.dimmedNodeClassName,
   );
 
   return (

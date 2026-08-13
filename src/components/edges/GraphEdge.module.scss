@@ -2,7 +2,7 @@
   stroke: #888;
   stroke-width: 2;
   fill: none;
-  transition: stroke 0.2s ease, stroke-width 0.2s ease;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
 
   &.inferred {
     stroke-dasharray: 8 8;
@@ -17,6 +17,12 @@
   :global(.react-flow__edge:hover) > & {
     stroke: var(--xy-edge-stroke-hover);
     stroke-width: 2.5;
+  }
+
+  &.dimmed {
+    // --tgv-dimmed-opacity is set on the graph surface (DEFAULT_DIMMED_OPACITY).
+    opacity: var(--tgv-dimmed-opacity);
+    pointer-events: none;
   }
 }
 
@@ -36,7 +42,12 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   white-space: nowrap;
   color: #666;
+  transition: opacity 0.2s ease;
   &.selected {
     color: #4285F4;
+  }
+  &.dimmed {
+    opacity: var(--tgv-dimmed-opacity);
+    pointer-events: none;
   }
 }

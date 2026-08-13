@@ -8,6 +8,19 @@
   border-radius: 4px;
   background-color: #fff9c4;
   box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.2s ease;
+
+  &:hover,
+  &.hovered {
+    border-color: #d4c44a;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  }
+
+  &.dimmed {
+    // --tgv-dimmed-opacity is set on the graph surface (DEFAULT_DIMMED_OPACITY).
+    opacity: var(--tgv-dimmed-opacity);
+    pointer-events: none;
+  }
 }
 
 .sizer,
@@ -70,6 +83,7 @@
 }
 
 .annotation:hover .deleteButton,
+.annotation.hovered .deleteButton,
 .annotation:focus-within .deleteButton {
   opacity: 1;
   pointer-events: auto;
