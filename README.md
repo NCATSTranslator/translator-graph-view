@@ -122,8 +122,10 @@ The `GraphView` container must have a defined width and height.
 | `onEdgeClick` | `(edge: GraphEdge) => void` | - | Fires when an edge is clicked |
 | `onNodeHover` | `(node: GraphNode \| null, geometry: HoverGeometry \| null) => void` | - | Fires when a node is hovered or unhovered |
 | `onEdgeHover` | `(edge: GraphEdge \| null, geometry: HoverGeometry \| null) => void` | - | Fires when an edge is hovered or unhovered |
-| `hoveredNodeId` | `string \| null` | - | Controlled hover: highlights the given node |
-| `hoveredEdgeId` | `string \| null` | - | Controlled hover: highlights the given edge |
+| `onAnnotationHover` | `(annotationId: string \| null) => void` | - | Fires when an annotation is hovered or unhovered |
+| `hoveredNodeId` | `string \| null` | - | Controlled hover: focuses the given node and dims the rest |
+| `hoveredEdgeId` | `string \| null` | - | Controlled hover: focuses the given edge + endpoints and dims the rest |
+| `hoveredAnnotationId` | `string \| null` | - | Controlled hover: shows annotation hovered state (no dimming) |
 | `nodeHoverAnchor` | `HoverAnchorPosition` | `'topCenter'` | Anchor point returned in `HoverGeometry` for node hovers |
 | `edgeHoverAnchor` | `HoverAnchorPosition` | `'midpoint'` | Anchor point returned in `HoverGeometry` for edge hovers |
 | `selectedIds` | `string[]` | - | Controlled selection by node/edge ID |
@@ -134,6 +136,7 @@ The `GraphView` container must have a defined width and height.
 | `annotations` | `GraphAnnotation[]` | - | Controlled annotation overlays (positions in graph coordinates) |
 | `onAnnotationsChange` | `(annotations: GraphAnnotation[]) => void` | - | Fires when an annotation is dragged, edited, or deleted |
 | `annotationStyles` | `GraphAnnotationStyles` | - | Client-configurable annotation appearance (background, delete button, icons) |
+| `hoverStyles` | `GraphHoverStyles` | - | Client-configurable hover / dim appearance (opacity, classNames) |
 | `className` | `string` | - | Additional CSS class for the container |
 
 #### `elkWorkerUrl`
@@ -208,9 +211,15 @@ The graph supports the following built-in interactions:
 
 The component supports both **uncontrolled** hover (internal styling only) and **controlled** hover (you drive the highlight state from outside). Use controlled hover to synchronize highlights between the graph and an external UI like a sidebar or detail panel.
 
+When a controlled hover id is set, the graph applies **neighborhood focus**:
+
+- **Node:** the hovered node, its incident edges, and neighbor nodes stay full opacity; everything else is dimmed.
+- **Edge:** that edge and its two endpoints stay full opacity; everything else is dimmed.
+- **Annotation:** the annotation shows its hovered style; the rest of the graph is not dimmed.
+
 **Uncontrolled** — nodes and edges show hover styles on mouseover with no props needed.
 
-**Outbound events** — use `onNodeHover` / `onEdgeHover` to react to hover changes:
+**Outbound events** — use `onNodeHover` / `onEdgeHover` / `onAnnotationHover` to react to hover changes:
 
 ```tsx
 const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
@@ -224,7 +233,7 @@ const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
 {hoveredNode && <div>Hovering: {hoveredNode.names[0]}</div>}
 ```
 
-**Controlled (bidirectional)** — pass `hoveredNodeId` / `hoveredEdgeId` to drive highlights from external UI (e.g. a sidebar list), and use `onNodeHover` / `onEdgeHover` to update that state when the user hovers inside the graph:
+**Controlled (bidirectional)** — pass `hoveredNodeId` / `hoveredEdgeId` / `hoveredAnnotationId` to drive highlights from external UI (e.g. a sidebar list), and use the outbound hover callbacks to update that state when the user hovers inside the graph:
 
 ```tsx
 const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -245,6 +254,32 @@ const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   onNodeHover={(node) => setHoveredNodeId(node?.id ?? null)}
 />
 ```
+
+#### Hover styles
+
+Override dimming / hovered appearance via `hoverStyles` (sensible defaults apply when omitted):
+
+```tsx
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  hoverStyles={{
+    dimmedOpacity: 0.25,
+    dimmedNodeClassName: 'my-dimmed-node',
+    hoveredAnnotationClassName: 'my-hovered-annotation',
+  }}
+/>
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `dimmedOpacity` | `0.3` | Opacity for dimmed elements (`--tgv-dimmed-opacity`) |
+| `dimmedNodeClassName` | - | Extra class on dimmed nodes |
+| `dimmedEdgeClassName` | - | Extra class on dimmed edges |
+| `dimmedAnnotationClassName` | - | Extra class on dimmed annotations |
+| `hoveredNodeClassName` | - | Extra class on hovered nodes |
+| `hoveredEdgeClassName` | - | Extra class on hovered edges |
+| `hoveredAnnotationClassName` | - | Extra class on hovered annotations |
 
 #### Hover geometry
 
