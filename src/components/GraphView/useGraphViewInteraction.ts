@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   useOnViewportChange,
   type Node,
@@ -8,16 +8,11 @@ import type {
   GraphData,
   GraphNode,
   GraphEdge,
-  GraphAnnotationStyles,
-  GraphHoverStyles,
   HoverAnchorPosition,
   HoverGeometry,
   Selection,
 } from '../../types';
 import { useSelection } from '../../hooks/useSelection';
-import { useStableAnnotationStyles } from '../../hooks/useStableAnnotationStyles';
-import { useStableHoverStyles } from '../../hooks/useStableHoverStyles';
-import type { GraphSettings } from '../../hooks/useGraphSettings';
 import {
   useHoverGeometry,
   type HoverGeometryHandlers,
@@ -33,14 +28,10 @@ interface UseGraphViewInteractionOptions {
   onAnnotationHover?: (annotationId: string | null) => void;
   nodeHoverAnchor?: HoverAnchorPosition;
   edgeHoverAnchor?: HoverAnchorPosition;
-  multiEdgeSpacing?: number;
-  annotationStyles?: GraphAnnotationStyles;
-  hoverStyles?: GraphHoverStyles;
 }
 
 interface GraphViewInteractionState {
   handleSelectionChange: ReturnType<typeof useSelection>['handleSelectionChange'];
-  settings: GraphSettings;
   graphSurfaceRef: React.RefObject<HTMLDivElement | null>;
   hoverHandlers: HoverGeometryHandlers;
   handleNodeClick: (event: React.MouseEvent, node: Node) => void;
@@ -57,9 +48,6 @@ export function useGraphViewInteraction({
   onAnnotationHover,
   nodeHoverAnchor = 'topCenter',
   edgeHoverAnchor = 'midpoint',
-  multiEdgeSpacing,
-  annotationStyles,
-  hoverStyles,
 }: UseGraphViewInteractionOptions): GraphViewInteractionState {
   const { handleSelectionChange } = useSelection({ data, onSelectionChange });
 
@@ -67,17 +55,6 @@ export function useGraphViewInteraction({
   dataRef.current = data;
 
   const graphSurfaceRef = useRef<HTMLDivElement>(null);
-  const stableAnnotationStyles = useStableAnnotationStyles(annotationStyles);
-  const stableHoverStyles = useStableHoverStyles(hoverStyles);
-
-  const settings = useMemo(
-    () => ({
-      multiEdgeSpacing: multiEdgeSpacing ?? 60,
-      annotationStyles: stableAnnotationStyles,
-      hoverStyles: stableHoverStyles,
-    }),
-    [multiEdgeSpacing, stableAnnotationStyles, stableHoverStyles],
-  );
 
   const hoverHandlers = useHoverGeometry({
     data,
@@ -114,7 +91,6 @@ export function useGraphViewInteraction({
 
   return {
     handleSelectionChange,
-    settings,
     graphSurfaceRef,
     hoverHandlers,
     handleNodeClick,
