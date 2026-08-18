@@ -18,6 +18,8 @@ Renders [Biolink Model](https://biolink.github.io/biolink-model/) knowledge grap
 - **Edge path styles** — bezier, straight, step, and smoothstep path options
 - **MiniMap and zoom controls** — zoomable/pannable minimap with neutral node dots
 - **Draggable graph annotations** — parent-controlled text notes with editable content, hover delete controls, configurable styling, and savable graph-space positions
+- **Node chrome** — optional client-rendered hover controls at the node corners, with `onNodeRemove` / `onNodeMenu` callbacks
+- **Optional connection handles** — hide and disable node connection handles via `showHandles`
 - **Smart text formatting** — gene/protein names uppercased, other names title-cased, Roman numerals detected and preserved
 - **Full TypeScript type definitions** — complete generics for nodes, edges, selections, geometry, and all props
 - **Dual module output** — ESM and CommonJS builds with a separate CSS stylesheet
@@ -26,7 +28,7 @@ Renders [Biolink Model](https://biolink.github.io/biolink-model/) knowledge grap
 
 ### Architecture
 
-The library exports a single primary component (`GraphView`) that wraps ReactFlow in a `ReactFlowProvider` and a settings context. Internally it:
+The library exports a single primary component (`GraphView`) that wraps ReactFlow in a `ReactFlowProvider`, a settings context, and a node-chrome context. Internally it:
 
 1. **Transforms input data** — converts the Biolink-model `GraphData` (a record-based format with `nodes` and `edges` keyed by ID) into ReactFlow's flat node/edge arrays. During transformation, each node is assigned a deterministic color via a hash of its primary Biolink type, a display label (first name), a simplified type string, and an SVG icon. Edges sharing the same node pair are indexed so the renderer can offset them.
 
@@ -38,7 +40,7 @@ The library exports a single primary component (`GraphView`) that wraps ReactFlo
 
 5. **Handles hover with geometry** — the `useHoverGeometry` hook tracks which node or edge the pointer is over, queries the DOM for its bounding rect (scoped to the current `GraphView` instance to avoid cross-graph collisions), computes a named anchor point, and invokes the caller's `onNodeHover`/`onEdgeHover` with the geometry. On viewport pan/zoom, geometry is re-measured via `requestAnimationFrame` so tooltip positions stay accurate.
 
-6. **Renders custom node and edge components** — `GraphNode` displays the type icon, a formatted label, and top/bottom handles, with color driven by a CSS custom property. `GraphEdge` supports four path algorithms plus a multi-edge quadratic bezier mode, dashed stroke for inferred edges, and a floating label rendered via ReactFlow's `EdgeLabelRenderer`.
+6. **Renders custom node and edge components** — `GraphNode` displays the type icon, a formatted label, top/bottom handles (optionally hidden), and client-provided hover chrome. `GraphEdge` supports four path algorithms plus a multi-edge quadratic bezier mode, dashed stroke for inferred edges, and a floating label rendered via ReactFlow's `EdgeLabelRenderer`.
 
 ### Layout Algorithms
 
@@ -132,6 +134,10 @@ The `GraphView` container must have a defined width and height.
 | `edgeType` | `EdgeType` | `'straight'` | Edge path style: `'bezier'`, `'straight'`, `'step'`, or `'smoothstep'` |
 | `showEdgeLabels` | `boolean` | `true` | Show predicate labels on edges |
 | `showMiniMap` | `boolean` | `true` | Show the zoomable/pannable minimap |
+| `showHandles` | `boolean` | `true` | Show connection handles on hover and allow connections |
+| `nodeChrome` | `GraphNodeChrome` | - | Client-rendered chrome at the top-left and bottom-right of each graph node |
+| `onNodeRemove` | `(nodeId: string) => void` | - | Fires from node chrome `onRemove` |
+| `onNodeMenu` | `(nodeId: string, position: { x: number; y: number }) => void` | - | Fires from node chrome `onMenu` with a viewport position |
 | `multiEdgeSpacing` | `number` | `60` | Pixel spacing between parallel edges sharing the same node pair |
 | `annotations` | `GraphAnnotation[]` | - | Controlled annotation overlays (positions in graph coordinates) |
 | `onAnnotationsChange` | `(annotations: GraphAnnotation[]) => void` | - | Fires when an annotation is dragged, edited, or deleted |
@@ -192,6 +198,30 @@ Each annotation shows as an editable text box with a pale yellow background by d
 - the user clicks the delete button
 
 Persist the returned array (localStorage, API, etc.) and pass it back through `annotations` on reload.
+
+### Node chrome
+
+Pass `nodeChrome` to render hover controls at the top-left and bottom-right corners of each graph node. Chrome is hidden until the node is hovered or contains focus (keyboard users can tab to chrome buttons). Memoize the `nodeChrome` object (or hoist slot renderers) so GraphView does not rebuild it every render.
+
+`onRemove` and `onMenu` are only present when you pass `onNodeRemove` / `onNodeMenu`. Pointer-triggered menus use `clientX` / `clientY`; keyboard activation (or calling `onMenu()` with no event) falls back to the node's bounding-rect center.
+
+```tsx
+const nodeChrome = {
+  topLeft: ({ onRemove }) =>
+    onRemove ? <button type="button" onClick={onRemove}>Remove</button> : null,
+  bottomRight: ({ onMenu }) =>
+    onMenu ? <button type="button" onClick={onMenu}>Menu</button> : null,
+};
+
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  showHandles={false}
+  nodeChrome={nodeChrome}
+  onNodeRemove={(nodeId) => console.log('remove', nodeId)}
+  onNodeMenu={(nodeId, position) => console.log('menu', nodeId, position)}
+/>
+```
 
 ### Interaction Model
 
@@ -421,13 +451,26 @@ interface GraphAnnotationStyles {
     icon?: React.ReactNode;
   };
 }
+
+interface GraphNodeChromeContext {
+  node: GraphNode;
+  selected: boolean;
+  onRemove?: () => void;
+  onMenu?: (event?: React.MouseEvent) => void;
+}
+
+interface GraphNodeChrome {
+  topLeft?: (ctx: GraphNodeChromeContext) => React.ReactNode;
+  bottomRight?: (ctx: GraphNodeChromeContext) => React.ReactNode;
+}
 ```
 
 ### Exported Hooks
 
 - **`useGraphLayout({ nodes, edges, layout, elkWorkerUrl })`** — Computes ELK layout positions for ReactFlow nodes/edges via a web worker. Returns `{ nodes, edges, isLayouting }`.
 - **`useSelection({ data, onSelectionChange })`** — Manages node/edge selection state, translating ReactFlow selection events back into domain-level objects.
-- **`useGraphSettings()`** — Access the `GraphSettings` context (currently exposes `multiEdgeSpacing`).
+- **`useGraphSettings()`** — Access the `GraphSettings` context (`multiEdgeSpacing`, `annotationStyles`, `hoverStyles`).
+- **`useNodeChrome()`** — Access the node-chrome context (`nodeChrome`, `onNodeRemove`, `onNodeMenu`) when rendering `GraphNode` outside `GraphView`.
 
 ### Exported Utilities
 
@@ -450,7 +493,7 @@ interface GraphAnnotationStyles {
 
 All TypeScript types are exported for consumer use:
 
-`GraphData`, `GraphNodeType`, `GraphEdgeType`, `GraphViewProps`, `LayoutType`, `EdgeType`, `Selection`, `Result`, `Path`, `Publication`, `Trial`, `Provenance`, `GraphNodeData`, `GraphEdgeData`, `FlowNode`, `FlowGraphNode`, `FlowAnnotationNode`, `FlowEdge`, `HoverAnchorPosition`, `HoverGeometry`, `GraphAnnotation`, `GraphAnnotationStyles`
+`GraphData`, `GraphNodeType`, `GraphEdgeType`, `GraphViewProps`, `LayoutType`, `EdgeType`, `Selection`, `Result`, `Path`, `Publication`, `Trial`, `Provenance`, `GraphNodeData`, `GraphEdgeData`, `FlowNode`, `FlowGraphNode`, `FlowAnnotationNode`, `FlowEdge`, `HoverAnchorPosition`, `HoverGeometry`, `GraphAnnotation`, `GraphAnnotationStyles`, `GraphHoverStyles`, `GraphNodeChrome`, `GraphNodeChromeContext`
 
 ## Development
 
@@ -474,6 +517,7 @@ The `example/` directory contains a full demo application that showcases all lib
 - Selection panel with node/edge lists
 - Bidirectional controlled hover between sidebar and graph
 - Tooltip positioning using hover geometry anchors
+- Node chrome (hover remove/menu controls) and optional connection handles
 - Graph statistics display
 
 ### Project Structure

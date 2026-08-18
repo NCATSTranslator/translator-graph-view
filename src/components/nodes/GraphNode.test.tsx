@@ -1,10 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { GraphNode } from './GraphNode';
+import { GraphSettingsContext } from '../../hooks/useGraphSettings';
+import { NodeChromeContext, type NodeChromeValue } from '../../hooks/useNodeChrome';
 import type { GraphNodeData, GraphNode as GraphNodeType } from '../../types';
 
-function renderNode(data: GraphNodeData, selected = false) {
+function renderNode(
+  data: GraphNodeData,
+  options?: { selected?: boolean; isConnectable?: boolean; chrome?: NodeChromeValue },
+) {
   // GraphNode is registered with React Flow as a custom node type and receives
   // many props from the framework. For a smoke test we only need the subset
   // the component actually reads.
@@ -12,9 +17,9 @@ function renderNode(data: GraphNodeData, selected = false) {
     id: 'n1',
     type: 'graphNode',
     data,
-    selected,
+    selected: options?.selected ?? false,
     dragging: false,
-    isConnectable: false,
+    isConnectable: options?.isConnectable ?? true,
     xPos: 0,
     yPos: 0,
     positionAbsoluteX: 0,
@@ -27,8 +32,12 @@ function renderNode(data: GraphNodeData, selected = false) {
   };
   return render(
     <ReactFlowProvider>
-      {/* @ts-expect-error — rendering the memoized node component directly */}
-      <GraphNode {...props} />
+      <GraphSettingsContext.Provider value={{ multiEdgeSpacing: 60 }}>
+        <NodeChromeContext.Provider value={options?.chrome ?? {}}>
+          {/* @ts-expect-error — rendering the memoized node component directly */}
+          <GraphNode {...props} />
+        </NodeChromeContext.Provider>
+      </GraphSettingsContext.Provider>
     </ReactFlowProvider>,
   );
 }
@@ -37,6 +46,13 @@ const baseGraphNode: GraphNodeType = {
   id: 'n1',
   names: ['aspirin'],
   types: ['biolink:Drug'],
+};
+
+const baseData: GraphNodeData = {
+  label: 'aspirin',
+  graphNode: baseGraphNode,
+  primaryType: 'Drug',
+  color: '#0000FF',
 };
 
 describe('GraphNode', () => {
@@ -61,12 +77,87 @@ describe('GraphNode', () => {
   });
 
   it('shows the raw label in the title attribute', () => {
-    renderNode({
-      label: 'raw label',
-      graphNode: baseGraphNode,
-      primaryType: 'Drug',
-      color: '#0000FF',
+    renderNode(baseData);
+    expect(screen.getByTitle('aspirin')).toBeInTheDocument();
+  });
+
+  it('does not render chrome when nodeChrome is omitted', () => {
+    renderNode(baseData);
+    expect(screen.queryByRole('button', { hidden: true })).not.toBeInTheDocument();
+  });
+
+  it('marks handles as not connectable when isConnectable is false', () => {
+    const { container } = renderNode(baseData, { isConnectable: false });
+    expect(container.querySelectorAll('.react-flow__handle.connectable')).toHaveLength(0);
+  });
+
+  it('marks handles as connectable by default', () => {
+    const { container } = renderNode(baseData);
+    expect(container.querySelectorAll('.react-flow__handle.connectable').length).toBeGreaterThan(0);
+  });
+
+  it('omits onRemove and onMenu when parent callbacks are missing', () => {
+    renderNode(baseData, {
+      chrome: {
+        nodeChrome: {
+          topLeft: ({ onRemove, onMenu }) => (
+            <>
+              <span>{onRemove ? 'has-remove' : 'no-remove'}</span>
+              <span>{onMenu ? 'has-menu' : 'no-menu'}</span>
+            </>
+          ),
+        },
+      },
     });
-    expect(screen.getByTitle('raw label')).toBeInTheDocument();
+    expect(screen.getByText('no-remove')).toBeInTheDocument();
+    expect(screen.getByText('no-menu')).toBeInTheDocument();
+  });
+
+  it('renders client chrome and wires remove and menu callbacks', () => {
+    const onNodeRemove = vi.fn();
+    const onNodeMenu = vi.fn();
+    renderNode(baseData, {
+      chrome: {
+        onNodeRemove,
+        onNodeMenu,
+        nodeChrome: {
+          topLeft: ({ onRemove }) => (
+            <button type="button" onClick={onRemove}>Remove</button>
+          ),
+          bottomRight: ({ onMenu }) => (
+            <button type="button" onClick={onMenu}>Menu</button>
+          ),
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove', hidden: true }));
+    expect(onNodeRemove).toHaveBeenCalledWith('n1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu', hidden: true }), {
+      clientX: 42,
+      clientY: 84,
+    });
+    expect(onNodeMenu).toHaveBeenCalledWith('n1', { x: 42, y: 84 });
+  });
+
+  it('falls back to the node bounding rect when menu is triggered without pointer coordinates', () => {
+    const onNodeMenu = vi.fn();
+    renderNode(baseData, {
+      chrome: {
+        onNodeMenu,
+        nodeChrome: {
+          bottomRight: ({ onMenu }) => (
+            <button type="button" onClick={() => onMenu?.()}>Menu</button>
+          ),
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu', hidden: true }));
+    expect(onNodeMenu).toHaveBeenCalledWith('n1', expect.objectContaining({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    }));
   });
 });

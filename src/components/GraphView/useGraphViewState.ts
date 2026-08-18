@@ -1,6 +1,8 @@
 import type { GraphViewProps, FlowEdge, FlowGraphNode } from '../../types';
 import type { AnnotationActions } from '../../hooks/useAnnotationActions';
 import type { GraphSettings } from '../../hooks/useGraphSettings';
+import { useGraphViewSettings } from '../../hooks/useGraphViewSettings';
+import { useNodeChromeValue, type NodeChromeValue } from '../../hooks/useNodeChrome';
 import type { HoverGeometryHandlers } from './hooks';
 import { useGraphViewNodeState } from './useGraphViewNodeState';
 import { useGraphViewInteraction } from './useGraphViewInteraction';
@@ -22,6 +24,7 @@ export interface GraphViewState {
   annotationActions: AnnotationActions;
   consumedFocusTokenRef: ReturnType<typeof useGraphViewNodeState>['consumedFocusTokenRef'];
   settings: GraphSettings;
+  nodeChromeValue: NodeChromeValue;
   graphSurfaceRef: ReturnType<typeof useGraphViewInteraction>['graphSurfaceRef'];
   hoverHandlers: HoverGeometryHandlers;
   handleNodeClick: ReturnType<typeof useGraphViewInteraction>['handleNodeClick'];
@@ -31,6 +34,8 @@ export interface GraphViewState {
 export function useGraphViewState(options: UseGraphViewStateOptions): GraphViewState {
   const nodeState = useGraphViewNodeState(options);
   const interaction = useGraphViewInteraction(options);
+  const settings = useGraphViewSettings(options);
+  const nodeChromeValue = useNodeChromeValue(options);
 
-  return { ...nodeState, ...interaction };
+  return { ...nodeState, ...interaction, settings, nodeChromeValue };
 }

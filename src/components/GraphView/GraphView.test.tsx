@@ -174,4 +174,42 @@ describe('GraphView', () => {
     expect(layoutFitViewCalls).toHaveLength(0);
     expect(focusFitViewCalls.length).toBeGreaterThan(0);
   });
+
+  it('hides connection handles when showHandles is false', async () => {
+    const { container } = render(
+      <GraphView data={data} elkWorkerUrl="mock://elk" showHandles={false} />,
+    );
+    await screen.findByText('Aspirin');
+    expect(container.querySelector('.handlesHidden') ?? container.querySelector('[class*="handlesHidden"]'))
+      .toBeTruthy();
+    expect(container.querySelectorAll('.react-flow__handle.connectable')).toHaveLength(0);
+  });
+
+  it('renders client node chrome and wires remove and menu callbacks', async () => {
+    const onNodeRemove = vi.fn();
+    const onNodeMenu = vi.fn();
+    render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        onNodeRemove={onNodeRemove}
+        onNodeMenu={onNodeMenu}
+        nodeChrome={{
+          topLeft: ({ onRemove }) => (
+            <button type="button" onClick={onRemove}>Remove node</button>
+          ),
+          bottomRight: ({ onMenu }) => (
+            <button type="button" onClick={onMenu}>Node menu</button>
+          ),
+        }}
+      />,
+    );
+    await screen.findByText('Aspirin');
+
+    fireEvent.click(screen.getAllByText('Remove node')[0]);
+    expect(onNodeRemove).toHaveBeenCalledWith('a');
+
+    fireEvent.click(screen.getAllByText('Node menu')[0], { clientX: 42, clientY: 84 });
+    expect(onNodeMenu).toHaveBeenCalledWith('a', { x: 42, y: 84 });
+  });
 });

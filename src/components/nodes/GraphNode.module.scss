@@ -1,4 +1,6 @@
 .node {
+  position: relative;
+  overflow: visible;
   display: flex;
   gap: 0px;
   flex-direction: row;
@@ -13,7 +15,7 @@
   box-shadow: none;
   cursor: pointer;
   transition: box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-  svg {
+  > svg {
     width: 24px;
     height: 24px;
   }
@@ -48,4 +50,29 @@
   max-width: calc(100% - 8px);
   line-height: 1.25;
   padding: 0 4px;
+}
+
+.chrome {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.chromeTopLeft {
+  top: -8px;
+  left: -8px;
+}
+
+.chromeBottomRight {
+  right: -8px;
+  bottom: -8px;
+}
+
+.node:hover .chrome,
+.node:focus-within .chrome {
+  opacity: 1;
+  pointer-events: auto;
 }

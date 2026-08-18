@@ -119,6 +119,22 @@
   position: relative;
 }
 
+.nodeChromeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .hoverGeometryMeta {
   margin-top: 8px;
   font-size: 11px;

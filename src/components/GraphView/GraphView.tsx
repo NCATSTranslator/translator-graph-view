@@ -21,6 +21,7 @@ import {
   DEFAULT_DIMMED_OPACITY,
 } from '../../hooks/useGraphSettings';
 import { AnnotationActionsContext } from '../../hooks/useAnnotationActions';
+import { NodeChromeContext } from '../../hooks/useNodeChrome';
 import { GraphNode } from '../nodes';
 import { GraphEdge } from '../edges';
 import { GraphAnnotationNode } from '../annotations';
@@ -62,6 +63,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
   const {
     className,
     showMiniMap = true,
+    showHandles = true,
     focusRequest,
     fitViewPadding = DEFAULT_FIT_VIEW_PADDING,
     layout,
@@ -78,6 +80,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
     handleNodeDragStop,
     annotationActions,
     settings,
+    nodeChromeValue,
     graphSurfaceRef,
     hoverHandlers,
     handleNodeClick,
@@ -104,65 +107,68 @@ function GraphViewInner(props: GraphViewInnerProps) {
   return (
     <AnnotationActionsContext.Provider value={annotationActions}>
       <GraphSettingsContext.Provider value={settings}>
-        <div
-          ref={graphSurfaceRef}
-          className={styles.graphSurface}
-          style={surfaceStyle}
-        >
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={handleNodeClick}
-            onEdgeClick={handleEdgeClick}
-            onNodeMouseEnter={hoverHandlers.handleNodeMouseEnter}
-            onNodeMouseLeave={hoverHandlers.handleNodeMouseLeave}
-            onEdgeMouseEnter={hoverHandlers.handleEdgeMouseEnter}
-            onEdgeMouseLeave={hoverHandlers.handleEdgeMouseLeave}
-            onNodeDragStop={handleNodeDragStop}
-            onSelectionChange={handleSelectionChange}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={defaultEdgeOptions}
-            selectionOnDrag
-            selectionMode={SelectionMode.Partial}
-            selectNodesOnDrag
-            panOnDrag={panOnDrag}
-            panOnScroll
-            zoomOnScroll
-            multiSelectionKeyCode="Shift"
-            fitView={layout !== 'custom'}
-            fitViewOptions={fitViewOptions}
-            minZoom={0.15}
-            maxZoom={3}
-            className={cn(styles.graphView, className)}
-            proOptions={proOptions}
+        <NodeChromeContext.Provider value={nodeChromeValue}>
+          <div
+            ref={graphSurfaceRef}
+            className={styles.graphSurface}
+            style={surfaceStyle}
           >
-            <GraphFocusHandler
-              focusRequest={focusRequest}
-              consumedTokenRef={consumedFocusTokenRef}
-            />
-            <CustomLayoutFitHandler
-              layout={layout}
-              fitViewPadding={fitViewPadding}
-              viewportSyncKey={viewportSyncKey}
-              layoutKey={layoutKey}
-              focusRequest={focusRequest}
-              consumedFocusTokenRef={consumedFocusTokenRef}
-            />
-            <Background color="#ddd" gap={20} />
-            <Controls fitViewOptions={fitViewOptions} />
-            {showMiniMap && (
-              <MiniMap
-                nodeColor={getMinimapNodeColor}
-                nodeStrokeWidth={3}
-                zoomable
-                pannable
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={handleNodeClick}
+              onEdgeClick={handleEdgeClick}
+              onNodeMouseEnter={hoverHandlers.handleNodeMouseEnter}
+              onNodeMouseLeave={hoverHandlers.handleNodeMouseLeave}
+              onEdgeMouseEnter={hoverHandlers.handleEdgeMouseEnter}
+              onEdgeMouseLeave={hoverHandlers.handleEdgeMouseLeave}
+              onNodeDragStop={handleNodeDragStop}
+              onSelectionChange={handleSelectionChange}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              defaultEdgeOptions={defaultEdgeOptions}
+              nodesConnectable={showHandles}
+              selectionOnDrag
+              selectionMode={SelectionMode.Partial}
+              selectNodesOnDrag
+              panOnDrag={panOnDrag}
+              panOnScroll
+              zoomOnScroll
+              multiSelectionKeyCode="Shift"
+              fitView={layout !== 'custom'}
+              fitViewOptions={fitViewOptions}
+              minZoom={0.15}
+              maxZoom={3}
+              className={cn(styles.graphView, !showHandles && styles.handlesHidden, className)}
+              proOptions={proOptions}
+            >
+              <GraphFocusHandler
+                focusRequest={focusRequest}
+                consumedTokenRef={consumedFocusTokenRef}
               />
-            )}
-          </ReactFlow>
-        </div>
+              <CustomLayoutFitHandler
+                layout={layout}
+                fitViewPadding={fitViewPadding}
+                viewportSyncKey={viewportSyncKey}
+                layoutKey={layoutKey}
+                focusRequest={focusRequest}
+                consumedFocusTokenRef={consumedFocusTokenRef}
+              />
+              <Background color="#ddd" gap={20} />
+              <Controls fitViewOptions={fitViewOptions} />
+              {showMiniMap && (
+                <MiniMap
+                  nodeColor={getMinimapNodeColor}
+                  nodeStrokeWidth={3}
+                  zoomable
+                  pannable
+                />
+              )}
+            </ReactFlow>
+          </div>
+        </NodeChromeContext.Provider>
       </GraphSettingsContext.Provider>
     </AnnotationActionsContext.Provider>
   );
