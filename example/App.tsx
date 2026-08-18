@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   GraphView,
   type GraphData,
+  type GraphNodeChrome,
   type LayoutType,
   type Selection,
 } from '../src';
@@ -36,6 +37,21 @@ const ELK_WORKER_URL = new URL('elkjs/lib/elk-worker.min.js', import.meta.url).h
 const TOOLTIP_OFFSET = { x: 12, y: 12 };
 const TOOLTIP_DELAY = 250;
 
+const NODE_CHROME: GraphNodeChrome = {
+  topLeft: ({ onRemove }) =>
+    onRemove ? (
+      <button type="button" className={styles.nodeChromeButton} onClick={onRemove} aria-label="Remove node">
+        ×
+      </button>
+    ) : null,
+  bottomRight: ({ onMenu }) =>
+    onMenu ? (
+      <button type="button" className={styles.nodeChromeButton} onClick={onMenu} aria-label="Node menu">
+        ⋮
+      </button>
+    ) : null,
+};
+
 function resolveDataset(
   dataset: DatasetKey,
   largeData: GraphData | null,
@@ -53,6 +69,7 @@ function App() {
   const [sidebarHoveredNodeId, setSidebarHoveredNodeId] = useState<string | null>(null);
   const [sidebarHoveredEdgeId, setSidebarHoveredEdgeId] = useState<string | null>(null);
   const { showMiniMap, setShowMiniMap } = usePersistedShowMiniMap();
+  const [showHandles, setShowHandles] = useState(true);
   const { annotations, setAnnotations, addAnnotation } = usePersistedAnnotations(dataset);
 
   const hover = useGraphHoverState(TOOLTIP_OFFSET);
@@ -98,6 +115,14 @@ function App() {
             ]}
             active={showMiniMap ? 'on' : 'off'}
             onChange={(value) => setShowMiniMap(value === 'on')}
+          />
+          <ToggleList
+            items={[
+              { label: 'Handles on', value: 'on' },
+              { label: 'Handles off', value: 'off' },
+            ]}
+            active={showHandles ? 'on' : 'off'}
+            onChange={(value) => setShowHandles(value === 'on')}
           />
         </SidebarSection>
 
@@ -168,6 +193,10 @@ function App() {
           edgeHoverAnchor="midpoint"
           showEdgeLabels={false}
           showMiniMap={showMiniMap}
+          showHandles={showHandles}
+          nodeChrome={NODE_CHROME}
+          onNodeRemove={(nodeId) => console.log('Remove node:', nodeId)}
+          onNodeMenu={(nodeId, position) => console.log('Node menu:', nodeId, position)}
         />
         {(tooltipNode || tooltipEdge) && hover.tooltipPos && (
           <div
