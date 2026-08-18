@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import type { Padding } from '@xyflow/system';
 
@@ -129,6 +129,26 @@ export interface GraphAnnotationStyles {
   };
 }
 
+/** Passed to client `nodeChrome` renderers for a single graph node. */
+export interface GraphNodeChromeContext {
+  node: GraphNode;
+  selected: boolean;
+  /** Present when GraphView was given `onNodeRemove`. */
+  onRemove?: () => void;
+  /**
+   * Present when GraphView was given `onNodeMenu`.
+   * Pointer events use client coordinates; keyboard activation (or a call with
+   * no event) falls back to the node's bounding-rect center.
+   */
+  onMenu?: (event?: MouseEvent) => void;
+}
+
+/** Client-provided chrome rendered at the node corners. Hidden until hover. */
+export interface GraphNodeChrome {
+  topLeft?: (ctx: GraphNodeChromeContext) => ReactNode;
+  bottomRight?: (ctx: GraphNodeChromeContext) => ReactNode;
+}
+
 /** Client-configurable hover / dim appearance. Built-in styles remain as defaults. */
 export interface GraphHoverStyles {
   /** Opacity applied to dimmed nodes/edges/annotations. Default: 0.3 */
@@ -227,5 +247,13 @@ export interface GraphViewProps {
   hoverStyles?: GraphHoverStyles;
   /** Show the zoomable/pannable minimap. */
   showMiniMap?: boolean;
+  /** When false, connection handles stay hidden and are not connectable. Default true. */
+  showHandles?: boolean;
+  /** Client-rendered chrome at the top-left and bottom-right of each graph node. */
+  nodeChrome?: GraphNodeChrome;
+  /** Fires from node chrome `onRemove`. */
+  onNodeRemove?: (nodeId: string) => void;
+  /** Fires from node chrome `onMenu` or a node right-click, with the pointer position. */
+  onNodeMenu?: (nodeId: string, position: { x: number; y: number }) => void;
   className?: string;
 }
