@@ -1,14 +1,97 @@
-import { memo } from 'react';
+import { memo, useMemo, useRef, type MouseEvent, type ReactNode, type RefObject } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { GraphNodeData } from '../../types';
+import type { GraphNode as GraphNodeType, GraphNodeChromeContext, GraphNodeData } from '../../types';
 import { capitalizeAllWords, getNodeTypeIcon } from '../../utils/utils';
 import { cn } from '../../utils/cn';
 import { useGraphSettings } from '../../hooks/useGraphSettings';
+import { useNodeChrome } from '../../hooks/useNodeChrome';
 import styles from './GraphNode.module.scss';
 
-function GraphNodeComponent({ data, selected }: NodeProps) {
+function NodeChromeSlot({
+  className,
+  children,
+}: {
+  className: string;
+  children: ReactNode;
+}) {
+  if (!children) return null;
+  return (
+    <div
+      className={cn(styles.chrome, className, 'nodrag', 'nopan')}
+      onClick={stopNodeEvent}
+      onMouseDown={stopNodeEvent}
+      onPointerDown={stopNodeEvent}
+    >
+      {children}
+    </div>
+  );
+}
+
+function stopNodeEvent(event: { stopPropagation(): void }) {
+  event.stopPropagation();
+}
+
+function menuPositionFromEvent(
+  event: MouseEvent | undefined,
+  nodeElement: HTMLElement | null,
+): { x: number; y: number } {
+  if (event && (event.clientX !== 0 || event.clientY !== 0)) {
+    return { x: event.clientX, y: event.clientY };
+  }
+  if (nodeElement) {
+    const rect = nodeElement.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }
+  return { x: 0, y: 0 };
+}
+
+function GraphNodeChromeSlots({
+  id,
+  node,
+  selected,
+  nodeRef,
+}: {
+  id: string;
+  node: GraphNodeType;
+  selected: boolean;
+  nodeRef: RefObject<HTMLDivElement | null>;
+}) {
+  const { nodeChrome, onNodeRemove, onNodeMenu } = useNodeChrome();
+  const chromeCtx = useMemo((): GraphNodeChromeContext | null => {
+    if (!nodeChrome) return null;
+    return {
+      node,
+      selected: Boolean(selected),
+      onRemove: onNodeRemove ? () => { onNodeRemove(id); } : undefined,
+      onMenu: onNodeMenu
+        ? (event?: MouseEvent) => {
+            onNodeMenu(id, menuPositionFromEvent(event, nodeRef.current));
+          }
+        : undefined,
+    };
+  }, [id, node, nodeChrome, nodeRef, onNodeMenu, onNodeRemove, selected]);
+
+  if (!chromeCtx || !nodeChrome) return null;
+
+  return (
+    <>
+      <NodeChromeSlot className={styles.chromeTopLeft}>
+        {nodeChrome.topLeft?.(chromeCtx)}
+      </NodeChromeSlot>
+      <NodeChromeSlot className={styles.chromeBottomRight}>
+        {nodeChrome.bottomRight?.(chromeCtx)}
+      </NodeChromeSlot>
+    </>
+  );
+}
+
+function GraphNodeComponent({ id, data, selected, isConnectable = true }: NodeProps) {
   const nodeData = data as GraphNodeData;
   const { hoverStyles } = useGraphSettings();
+  const nodeRef = useRef<HTMLDivElement>(null);
   const nodeStyle = {
     '--node-color': nodeData.color,
   } as React.CSSProperties;
@@ -29,10 +112,11 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
 
   return (
     <div
+      ref={nodeRef}
       className={className}
       style={nodeStyle}
     >
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
 
       {nodeTypeIcon}
 
@@ -40,7 +124,14 @@ function GraphNodeComponent({ data, selected }: NodeProps) {
         {nodeLabel}
       </div>
 
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
+
+      <GraphNodeChromeSlots
+        id={id}
+        node={nodeData.graphNode}
+        selected={Boolean(selected)}
+        nodeRef={nodeRef}
+      />
     </div>
   );
 }
