@@ -69,7 +69,9 @@ export default defineConfig(({ mode }) => {
             'react/jsx-runtime': 'jsxRuntime',
           },
           assetFileNames: (assetInfo) => {
-            if (assetInfo.name === 'style.css') return 'styles.css';
+            if (assetInfo.name === 'style.css' || assetInfo.name === 'translator-graph-view.css') {
+              return 'styles.css';
+            }
             return assetInfo.name || 'asset';
           },
         },
