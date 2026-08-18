@@ -9,6 +9,8 @@ export { useGraphLayout } from './hooks/useGraphLayout';
 export { useSelection } from './hooks/useSelection';
 export { useGraphSettings, GraphSettingsContext, DEFAULT_DIMMED_OPACITY } from './hooks/useGraphSettings';
 export type { GraphSettings } from './hooks/useGraphSettings';
+export { useNodeChrome, NodeChromeContext } from './hooks/useNodeChrome';
+export type { NodeChromeValue } from './hooks/useNodeChrome';
 
 // Layouts
 export { layoutConfigs, getLayoutOptions } from './layouts';
@@ -57,6 +59,8 @@ export type {
   GraphAnnotation,
   GraphAnnotationStyles,
   GraphHoverStyles,
+  GraphNodeChrome,
+  GraphNodeChromeContext,
   NodePosition,
   NodePositionMap,
   FitViewPadding,
