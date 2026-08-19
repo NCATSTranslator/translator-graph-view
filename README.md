@@ -136,6 +136,7 @@ The `GraphView` container must have a defined width and height.
 | `showMiniMap` | `boolean` | `true` | Show the zoomable/pannable minimap |
 | `showHandles` | `boolean` | `true` | Show connection handles on hover and allow connections |
 | `nodeChrome` | `GraphNodeChrome` | - | Client-rendered chrome at the top-left and bottom-right of each graph node |
+| `getNodeIcon` | `GraphNodeIconRenderer` | - | Client icon lookup; `null`/`undefined` uses the library default, `false` hides the icon |
 | `onNodeRemove` | `(nodeId: string) => void` | - | Fires from node chrome `onRemove` |
 | `onNodeMenu` | `(nodeId: string, position: { x: number; y: number }) => void` | - | Fires from node chrome `onMenu` with a viewport position |
 | `multiEdgeSpacing` | `number` | `60` | Pixel spacing between parallel edges sharing the same node pair |
@@ -220,6 +221,30 @@ const nodeChrome = {
   nodeChrome={nodeChrome}
   onNodeRemove={(nodeId) => console.log('remove', nodeId)}
   onNodeMenu={(nodeId, position) => console.log('menu', nodeId, position)}
+/>
+```
+
+### Node icons
+
+Pass `getNodeIcon` to replace the built-in type icon on each graph node. The first argument is the **simplified primary type** (for example `"Drug"`), not a Biolink CURIE. Full types are on `node.types`.
+
+- Return `null` or `undefined` to keep the library icon for that node.
+- Return `false` to hide the icon.
+- Icons are wrapped in a 24×24 slot that sizes both `svg` and `img`.
+
+The library keeps the callback identity stable, so an inline `getNodeIcon` does not re-render edges or annotations. Hoist or wrap in `useCallback` if you also want to avoid extra work inside the renderer itself. Compose with `getNodeTypeIcon` when you only want to override some types.
+
+```tsx
+import { GraphView, getNodeTypeIcon } from 'translator-graph-view';
+
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  getNodeIcon={(type, node) => {
+    if (node.id === 'special') return <img alt="" src="/special.svg" />;
+    if (type === 'Drug') return <MyDrugIcon />;
+    return getNodeTypeIcon(type);
+  }}
 />
 ```
 
@@ -463,6 +488,11 @@ interface GraphNodeChrome {
   topLeft?: (ctx: GraphNodeChromeContext) => React.ReactNode;
   bottomRight?: (ctx: GraphNodeChromeContext) => React.ReactNode;
 }
+
+type GraphNodeIconRenderer = (
+  type: string,
+  node: GraphNode,
+) => React.ReactNode | null | undefined;
 ```
 
 ### Exported Hooks
@@ -470,7 +500,7 @@ interface GraphNodeChrome {
 - **`useGraphLayout({ nodes, edges, layout, elkWorkerUrl })`** — Computes ELK layout positions for ReactFlow nodes/edges via a web worker. Returns `{ nodes, edges, isLayouting }`.
 - **`useSelection({ data, onSelectionChange })`** — Manages node/edge selection state, translating ReactFlow selection events back into domain-level objects.
 - **`useGraphSettings()`** — Access the `GraphSettings` context (`multiEdgeSpacing`, `annotationStyles`, `hoverStyles`).
-- **`useNodeChrome()`** — Access the node-chrome context (`nodeChrome`, `onNodeRemove`, `onNodeMenu`) when rendering `GraphNode` outside `GraphView`.
+- **`useNodeChrome()`** — Access the node-chrome context (`nodeChrome`, `onNodeRemove`, `onNodeMenu`, `getNodeIcon`) when rendering `GraphNode` outside `GraphView`.
 
 ### Exported Utilities
 
@@ -482,6 +512,7 @@ interface GraphNodeChrome {
 | `extractAnnotationsFromFlow(nodes)` | Extract `GraphAnnotation[]` from a ReactFlow node array |
 | `isAnnotationNode(node)` | Type guard for annotation flow nodes |
 | `getColorForType(type)` | Get a deterministic color for a Biolink type string (18-color palette) |
+| `getNodeTypeIcon(type)` | Return the library SVG icon for a simplified (or `biolink:`) type |
 | `simplifyTypeName(type)` | Extract a readable name from a prefixed type URI (`"biolink:Drug"` → `"Drug"`) |
 | `getPrimaryType(types)` | Return the first type from a types array |
 | `formatPredicate(predicate)` | Format a predicate for display (`"biolink:treats"` → `"treats"`) |
