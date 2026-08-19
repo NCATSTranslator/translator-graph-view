@@ -6,6 +6,8 @@ export {
 
 export { cn } from './cn';
 
+export { getNodeTypeIcon } from './utils';
+
 export {
   transformNodesToFlow,
   transformEdgesToFlow,
