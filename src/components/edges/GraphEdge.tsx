@@ -112,15 +112,23 @@ function resolveEdgeDataProps(data: GraphEdgeData | undefined): ResolvedEdgeProp
   };
 }
 
-function buildEdgePathClassName(
-  styles: Record<string, string>,
-  selected: boolean,
-  inferred: boolean,
-  hovered: boolean,
-  dimmed: boolean,
-  extraHoveredClassName?: string,
-  extraDimmedClassName?: string,
-): string {
+function buildEdgePathClassName({
+  styles,
+  selected,
+  inferred,
+  hovered,
+  dimmed,
+  extraHoveredClassName,
+  extraDimmedClassName,
+}: {
+  styles: Record<string, string>;
+  selected: boolean;
+  inferred: boolean;
+  hovered: boolean;
+  dimmed: boolean;
+  extraHoveredClassName?: string;
+  extraDimmedClassName?: string;
+}): string {
   const classes = [styles.edgePath];
   if (selected) classes.push(styles.selected);
   if (inferred) classes.push(styles.inferred);
@@ -176,15 +184,15 @@ function GraphEdgeComponent({
     targetX, targetY, targetPosition,
   ]);
 
-  const pathClassName = buildEdgePathClassName(
+  const pathClassName = buildEdgePathClassName({
     styles,
-    !!selected,
+    selected: !!selected,
     inferred,
     hovered,
     dimmed,
-    hoverStyles?.hoveredEdgeClassName,
-    hoverStyles?.dimmedEdgeClassName,
-  );
+    extraHoveredClassName: hoverStyles?.hoveredEdgeClassName,
+    extraDimmedClassName: hoverStyles?.dimmedEdgeClassName,
+  });
 
   return (
     <>

@@ -149,6 +149,19 @@ export interface GraphNodeChrome {
   bottomRight?: (ctx: GraphNodeChromeContext) => ReactNode;
 }
 
+/**
+ * Client icon for a graph node.
+ *
+ * `type` is the simplified primary type (e.g. `"Drug"`), not a Biolink CURIE.
+ * Full Biolink types are on `node.types`.
+ *
+ * Return `null` or `undefined` to use the library default, or `false` to hide the icon.
+ */
+export type GraphNodeIconRenderer = (
+  type: string,
+  node: GraphNode,
+) => ReactNode | null | undefined;
+
 /** Client-configurable hover / dim appearance. Built-in styles remain as defaults. */
 export interface GraphHoverStyles {
   /** Opacity applied to dimmed nodes/edges/annotations. Default: 0.3 */
@@ -251,6 +264,12 @@ export interface GraphViewProps {
   showHandles?: boolean;
   /** Client-rendered chrome at the top-left and bottom-right of each graph node. */
   nodeChrome?: GraphNodeChrome;
+  /**
+   * Client icon lookup. `type` is the simplified primary type (e.g. `"Drug"`);
+   * full Biolink types are on `node.types`. Return `null`/`undefined` for the
+   * library default, or `false` to hide the icon.
+   */
+  getNodeIcon?: GraphNodeIconRenderer;
   /** Fires from node chrome `onRemove`. */
   onNodeRemove?: (nodeId: string) => void;
   /** Fires from node chrome `onMenu` or a node right-click, with the pointer position. */

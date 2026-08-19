@@ -187,8 +187,8 @@ export function GraphView(props: GraphViewProps) {
   );
 
   const initialNodes = useMemo(
-    () => transformNodesToFlow(data, layout === 'custom' ? nodePositions : undefined),
-    [data, layout, nodePositionsKey, nodePositions],
+    () => transformNodesToFlow(data, nodePositionsKey ? nodePositions : undefined),
+    [data, nodePositions, nodePositionsKey],
   );
   const initialEdges = useMemo(
     () => transformEdgesToFlow(data, edgeType, showEdgeLabels),

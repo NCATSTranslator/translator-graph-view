@@ -212,4 +212,16 @@ describe('GraphView', () => {
     fireEvent.click(screen.getAllByText('Node menu')[0], { clientX: 42, clientY: 84 });
     expect(onNodeMenu).toHaveBeenCalledWith('a', { x: 42, y: 84 });
   });
+
+  it('renders a client node icon when getNodeIcon is provided', async () => {
+    render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        getNodeIcon={() => <span>host-icon</span>}
+      />,
+    );
+    await screen.findByText('Aspirin');
+    expect(screen.getAllByText('host-icon').length).toBeGreaterThan(0);
+  });
 });

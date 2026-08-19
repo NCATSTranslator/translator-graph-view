@@ -1,12 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
-import type { GraphNodeChrome } from '../types';
+import type { GraphNodeChrome, GraphNodeIconRenderer } from '../types';
+import { useStableCallback } from './useStableCallback';
 import { useStableValue } from './useStableValue';
 
 export interface NodeChromeValue {
   nodeChrome?: GraphNodeChrome;
   onNodeRemove?: (nodeId: string) => void;
   onNodeMenu?: (nodeId: string, position: { x: number; y: number }) => void;
+  getNodeIcon?: GraphNodeIconRenderer;
 }
 
 const defaults: NodeChromeValue = {};
@@ -26,34 +28,20 @@ export function useNodeChromeValue({
   nodeChrome,
   onNodeRemove,
   onNodeMenu,
+  getNodeIcon,
 }: NodeChromeValue): NodeChromeValue {
   const stableNodeChrome = useStableValue(nodeChrome, nodeChromeEqual);
-
-  const onNodeRemoveRef = useRef(onNodeRemove);
-  onNodeRemoveRef.current = onNodeRemove;
-  const onNodeMenuRef = useRef(onNodeMenu);
-  onNodeMenuRef.current = onNodeMenu;
-
-  const stableOnNodeRemove = useCallback((nodeId: string) => {
-    onNodeRemoveRef.current?.(nodeId);
-  }, []);
-
-  const stableOnNodeMenu = useCallback((
-    nodeId: string,
-    position: { x: number; y: number },
-  ) => {
-    onNodeMenuRef.current?.(nodeId, position);
-  }, []);
-
-  const hasRemove = Boolean(onNodeRemove);
-  const hasMenu = Boolean(onNodeMenu);
+  const stableOnNodeRemove = useStableCallback(onNodeRemove);
+  const stableOnNodeMenu = useStableCallback(onNodeMenu);
+  const stableGetNodeIcon = useStableCallback(getNodeIcon);
 
   return useMemo(
     () => ({
       nodeChrome: stableNodeChrome,
-      onNodeRemove: hasRemove ? stableOnNodeRemove : undefined,
-      onNodeMenu: hasMenu ? stableOnNodeMenu : undefined,
+      onNodeRemove: stableOnNodeRemove,
+      onNodeMenu: stableOnNodeMenu,
+      getNodeIcon: stableGetNodeIcon,
     }),
-    [hasMenu, hasRemove, stableNodeChrome, stableOnNodeMenu, stableOnNodeRemove],
+    [stableGetNodeIcon, stableNodeChrome, stableOnNodeMenu, stableOnNodeRemove],
   );
 }

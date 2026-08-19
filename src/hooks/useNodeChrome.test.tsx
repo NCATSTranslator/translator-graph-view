@@ -9,6 +9,7 @@ describe('useNodeChrome', () => {
     expect(result.current.nodeChrome).toBeUndefined();
     expect(result.current.onNodeRemove).toBeUndefined();
     expect(result.current.onNodeMenu).toBeUndefined();
+    expect(result.current.getNodeIcon).toBeUndefined();
   });
 
   it('returns the provider value when wrapped', () => {
@@ -29,6 +30,7 @@ describe('useNodeChromeValue', () => {
     const { result } = renderHook(() => useNodeChromeValue({}));
     expect(result.current.onNodeRemove).toBeUndefined();
     expect(result.current.onNodeMenu).toBeUndefined();
+    expect(result.current.getNodeIcon).toBeUndefined();
   });
 
   it('keeps callback identities stable when parent handlers change', () => {
@@ -68,5 +70,33 @@ describe('useNodeChromeValue', () => {
     const first = result.current.nodeChrome;
     rerender({ nodeChrome: { topLeft } });
     expect(result.current.nodeChrome).toBe(first);
+  });
+
+  it('keeps getNodeIcon identity and the context value stable when the parent renderer changes', () => {
+    const { result, rerender } = renderHook(
+      ({ getNodeIcon }: { getNodeIcon: () => null }) => useNodeChromeValue({ getNodeIcon }),
+      { initialProps: { getNodeIcon: () => null } },
+    );
+
+    const firstValue = result.current;
+    const firstIcon = result.current.getNodeIcon;
+    const latest = vi.fn(() => null);
+    rerender({ getNodeIcon: latest });
+
+    expect(result.current).toBe(firstValue);
+    expect(result.current.getNodeIcon).toBe(firstIcon);
+    result.current.getNodeIcon?.('Drug', { id: 'n1', names: [], types: [] });
+    expect(latest).toHaveBeenCalledWith('Drug', { id: 'n1', names: [], types: [] });
+  });
+
+  it('drops getNodeIcon when the parent omits it', () => {
+    const { result, rerender } = renderHook(
+      ({ getNodeIcon }: { getNodeIcon?: () => null }) => useNodeChromeValue({ getNodeIcon }),
+      { initialProps: { getNodeIcon: (() => null) as (() => null) | undefined } },
+    );
+
+    expect(result.current.getNodeIcon).toBeTypeOf('function');
+    rerender({ getNodeIcon: undefined });
+    expect(result.current.getNodeIcon).toBeUndefined();
   });
 });

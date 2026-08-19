@@ -15,10 +15,6 @@
   box-shadow: none;
   cursor: pointer;
   transition: box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-  > svg {
-    width: 24px;
-    height: 24px;
-  }
   &:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
@@ -36,6 +32,21 @@
   &.selected {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transform: scale(1.05);
+  }
+}
+
+.icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+
+  svg,
+  img {
+    width: 24px;
+    height: 24px;
   }
 }
 

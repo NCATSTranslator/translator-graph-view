@@ -29,6 +29,44 @@ const emptySets = (): HoverFocusSets => ({
   isDimming: false,
 });
 
+function focusFromHoveredNode(edges: HoverFocusEdge[], hoveredNodeId: string): HoverFocusSets {
+  const focusedNodeIds = new Set<string>([hoveredNodeId]);
+  const focusedEdgeIds = new Set<string>();
+  for (const edge of edges) {
+    if (edge.source === hoveredNodeId || edge.target === hoveredNodeId) {
+      focusedEdgeIds.add(edge.id);
+      focusedNodeIds.add(edge.source);
+      focusedNodeIds.add(edge.target);
+    }
+  }
+  return {
+    hoveredNodeIds: new Set([hoveredNodeId]),
+    hoveredEdgeIds: new Set(),
+    hoveredAnnotationIds: new Set(),
+    focusedNodeIds,
+    focusedEdgeIds,
+    isDimming: true,
+  };
+}
+
+function focusFromHoveredEdge(edges: HoverFocusEdge[], hoveredEdgeId: string): HoverFocusSets {
+  const edge = edges.find((item) => item.id === hoveredEdgeId);
+  const focusedNodeIds = new Set<string>();
+  const focusedEdgeIds = new Set<string>([hoveredEdgeId]);
+  if (edge) {
+    focusedNodeIds.add(edge.source);
+    focusedNodeIds.add(edge.target);
+  }
+  return {
+    hoveredNodeIds: new Set(),
+    hoveredEdgeIds: new Set([hoveredEdgeId]),
+    hoveredAnnotationIds: new Set(),
+    focusedNodeIds,
+    focusedEdgeIds,
+    isDimming: true,
+  };
+}
+
 /**
  * Resolve neighborhood hover focus.
  * Preference when multiple ids are set: annotation > node > edge.
@@ -46,41 +84,11 @@ export function computeHoverFocus(
   }
 
   if (hoveredNodeId) {
-    const focusedNodeIds = new Set<string>([hoveredNodeId]);
-    const focusedEdgeIds = new Set<string>();
-    for (const edge of edges) {
-      if (edge.source === hoveredNodeId || edge.target === hoveredNodeId) {
-        focusedEdgeIds.add(edge.id);
-        focusedNodeIds.add(edge.source);
-        focusedNodeIds.add(edge.target);
-      }
-    }
-    return {
-      hoveredNodeIds: new Set([hoveredNodeId]),
-      hoveredEdgeIds: new Set(),
-      hoveredAnnotationIds: new Set(),
-      focusedNodeIds,
-      focusedEdgeIds,
-      isDimming: true,
-    };
+    return focusFromHoveredNode(edges, hoveredNodeId);
   }
 
   if (hoveredEdgeId) {
-    const edge = edges.find((item) => item.id === hoveredEdgeId);
-    const focusedNodeIds = new Set<string>();
-    const focusedEdgeIds = new Set<string>([hoveredEdgeId]);
-    if (edge) {
-      focusedNodeIds.add(edge.source);
-      focusedNodeIds.add(edge.target);
-    }
-    return {
-      hoveredNodeIds: new Set(),
-      hoveredEdgeIds: new Set([hoveredEdgeId]),
-      hoveredAnnotationIds: new Set(),
-      focusedNodeIds,
-      focusedEdgeIds,
-      isDimming: true,
-    };
+    return focusFromHoveredEdge(edges, hoveredEdgeId);
   }
 
   return emptySets();
