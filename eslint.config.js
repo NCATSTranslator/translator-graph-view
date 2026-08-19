@@ -96,6 +96,14 @@ export default [
     }
   },
   {
+    // describe/it callbacks are suites, not units of complexity
+    files: ['**/*.{test,spec}.{ts,tsx}'],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-statements': 'off',
+    },
+  },
+  {
     plugins: { sonarjs },
     rules: Object.fromEntries(
       Object.entries(sonarjs.configs.recommended.rules)
