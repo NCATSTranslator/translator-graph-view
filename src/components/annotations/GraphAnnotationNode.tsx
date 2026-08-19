@@ -32,6 +32,51 @@ function syncTextareaHeight(textarea: HTMLTextAreaElement): void {
   textarea.style.height = `${Math.max(MIN_TEXTAREA_HEIGHT, textarea.scrollHeight)}px`;
 }
 
+function optionalBackground(color?: string): React.CSSProperties | undefined {
+  return color ? { backgroundColor: color } : undefined;
+}
+
+function AnnotationDeleteButton({
+  className,
+  style,
+  icon,
+  onDelete,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+  icon?: React.ReactNode;
+  onDelete: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(styles.deleteButton, 'nodrag', 'nopan', className)}
+      style={style}
+      aria-label="Delete annotation"
+      onClick={onDelete}
+    >
+      {icon ?? <DefaultDeleteIcon />}
+    </button>
+  );
+}
+
+function annotationNodeClassName(
+  annotationClassName: string | undefined,
+  hovered: boolean | undefined,
+  dimmed: boolean | undefined,
+  hoveredClassName?: string,
+  dimmedClassName?: string,
+): string {
+  return cn(
+    styles.annotation,
+    annotationClassName,
+    hovered && styles.hovered,
+    dimmed && styles.dimmed,
+    hovered && hoveredClassName,
+    dimmed && dimmedClassName,
+  );
+}
+
 function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
   const nodeData = data as GraphAnnotationData;
   const { annotationStyles, hoverStyles } = useGraphSettings();
@@ -49,14 +94,6 @@ function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
       syncTextareaHeight(textareaRef.current);
     }
   }, [text]);
-
-  const containerStyle = annotationStyles?.backgroundColor
-    ? { backgroundColor: annotationStyles.backgroundColor }
-    : undefined;
-
-  const deleteButtonStyle = annotationStyles?.deleteButton?.backgroundColor
-    ? { backgroundColor: annotationStyles.deleteButton.backgroundColor }
-    : undefined;
 
   const handleChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(event.target.value);
@@ -79,31 +116,22 @@ function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
 
   return (
     <div
-      className={cn(
-        styles.annotation,
+      className={annotationNodeClassName(
         annotationStyles?.className,
-        nodeData.hovered && styles.hovered,
-        nodeData.dimmed && styles.dimmed,
-        nodeData.hovered && hoverStyles?.hoveredAnnotationClassName,
-        nodeData.dimmed && hoverStyles?.dimmedAnnotationClassName,
+        nodeData.hovered,
+        nodeData.dimmed,
+        hoverStyles?.hoveredAnnotationClassName,
+        hoverStyles?.dimmedAnnotationClassName,
       )}
-      style={containerStyle}
+      style={optionalBackground(annotationStyles?.backgroundColor)}
     >
       {!readOnly && (
-        <button
-          type="button"
-          className={cn(
-            styles.deleteButton,
-            'nodrag',
-            'nopan',
-            annotationStyles?.deleteButton?.className,
-          )}
-          style={deleteButtonStyle}
-          aria-label="Delete annotation"
-          onClick={handleDelete}
-        >
-          {annotationStyles?.deleteButton?.icon ?? <DefaultDeleteIcon />}
-        </button>
+        <AnnotationDeleteButton
+          className={annotationStyles?.deleteButton?.className}
+          style={optionalBackground(annotationStyles?.deleteButton?.backgroundColor)}
+          icon={annotationStyles?.deleteButton?.icon}
+          onDelete={handleDelete}
+        />
       )}
       <div className={styles.sizer}>{text || DEFAULT_PLACEHOLDER}</div>
       <textarea

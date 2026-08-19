@@ -62,11 +62,7 @@ export function useGraphViewNodeState({
   const consumedFocusTokenRef = useRef<number | undefined>(undefined);
 
   const { nodes: layoutedNodes, edges: layoutedEdges, isLayouting } = useGraphLayout({
-    nodes: initialNodes,
-    edges: initialEdges,
-    layout,
-    elkWorkerUrl,
-    onLayoutComplete,
+    nodes: initialNodes, edges: initialEdges, layout, elkWorkerUrl, onLayoutComplete,
   });
 
   const layoutKey = useMemo(() => getLayoutKey(layoutedNodes), [layoutedNodes]);
@@ -108,16 +104,10 @@ export function useGraphViewNodeState({
   });
 
   useControlledSelection(selectedIds, setNodes, setEdges);
-  useControlledHover(
-    hoveredNodeId,
-    hoveredEdgeId,
-    hoveredAnnotationId,
-    edges,
-    setNodes,
-    setEdges,
-    layoutKey,
-    annotationsKey,
-  );
+  useControlledHover({
+    hoveredNodeId, hoveredEdgeId, hoveredAnnotationId,
+    edges, setNodes, setEdges, layoutKey, annotationsKey,
+  });
 
   return {
     isLayouting,

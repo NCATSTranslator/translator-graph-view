@@ -61,6 +61,49 @@ function applyElkPositions(nodes: FlowGraphNode[], layoutedGraph: ElkNode): Flow
   }));
 }
 
+interface LayoutStateSetters {
+  setLayoutedNodes: (nodes: FlowGraphNode[]) => void;
+  setLayoutedEdges: (edges: FlowEdge[]) => void;
+  setIsLayouting: (value: boolean) => void;
+}
+
+function applyCustomLayout(
+  nodes: FlowGraphNode[],
+  edges: FlowEdge[],
+  setters: LayoutStateSetters,
+  onLayoutComplete?: (positions: NodePositionMap) => void,
+): void {
+  setters.setLayoutedNodes(nodes);
+  setters.setLayoutedEdges(edges);
+  setters.setIsLayouting(false);
+  onLayoutComplete?.(flowGraphNodesToPositionMap(nodes));
+}
+
+async function applyElkLayout({
+  elk,
+  nodes,
+  edges,
+  layout,
+  cancelled,
+  setters,
+  onLayoutComplete,
+}: {
+  elk: InstanceType<typeof ELK>;
+  nodes: FlowGraphNode[];
+  edges: FlowEdge[];
+  layout: LayoutType;
+  cancelled: () => boolean;
+  setters: LayoutStateSetters;
+  onLayoutComplete?: (positions: NodePositionMap) => void;
+}): Promise<void> {
+  const layoutedGraph = await elk.layout(buildElkGraph(nodes, edges, layout));
+  if (cancelled() || !layoutedGraph.children) return;
+  const positioned = applyElkPositions(nodes, layoutedGraph);
+  setters.setLayoutedNodes(positioned);
+  setters.setLayoutedEdges(edges);
+  onLayoutComplete?.(flowGraphNodesToPositionMap(positioned));
+}
+
 export function useGraphLayout({
   nodes,
   edges,
@@ -77,6 +120,7 @@ export function useGraphLayout({
   const [isLayouting, setIsLayouting] = useState(false);
 
   const applyLayout = useCallback(async (cancelled: () => boolean) => {
+    const setters = { setLayoutedNodes, setLayoutedEdges, setIsLayouting };
     if (nodes.length === 0) {
       setLayoutedNodes([]);
       setLayoutedEdges([]);
@@ -84,28 +128,24 @@ export function useGraphLayout({
     }
 
     if (layout === 'custom') {
-      setLayoutedNodes(nodes);
-      setLayoutedEdges(edges);
-      setIsLayouting(false);
-      onLayoutCompleteRef.current?.(flowGraphNodesToPositionMap(nodes));
+      applyCustomLayout(nodes, edges, setters, onLayoutCompleteRef.current);
       return;
     }
 
     setIsLayouting(true);
-
     try {
-      const layoutedGraph = await elk.layout(buildElkGraph(nodes, edges, layout));
-      if (cancelled()) return;
-      if (layoutedGraph.children) {
-        const positioned = applyElkPositions(nodes, layoutedGraph);
-        setLayoutedNodes(positioned);
-        setLayoutedEdges(edges);
-        onLayoutCompleteRef.current?.(flowGraphNodesToPositionMap(positioned));
-      }
+      await applyElkLayout({
+        elk,
+        nodes,
+        edges,
+        layout,
+        cancelled,
+        setters,
+        onLayoutComplete: onLayoutCompleteRef.current,
+      });
     } catch (error) {
       if (cancelled()) return;
       console.error('Layout error:', error);
-      // Fall back to original positions
       setLayoutedNodes(nodes);
       setLayoutedEdges(edges);
     } finally {
