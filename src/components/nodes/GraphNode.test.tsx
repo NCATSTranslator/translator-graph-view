@@ -2,13 +2,19 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { GraphNode } from './GraphNode';
+import styles from './GraphNode.module.scss';
 import { GraphSettingsContext } from '../../hooks/useGraphSettings';
 import { NodeChromeContext, type NodeChromeValue } from '../../hooks/useNodeChrome';
-import type { GraphNodeData, GraphNode as GraphNodeType } from '../../types';
+import type { GraphNodeData, GraphNode as GraphNodeType, GraphNodeIconRenderer } from '../../types';
 
 function renderNode(
   data: GraphNodeData,
-  options?: { selected?: boolean; isConnectable?: boolean; chrome?: NodeChromeValue },
+  options?: {
+    selected?: boolean;
+    isConnectable?: boolean;
+    chrome?: NodeChromeValue;
+    getNodeIcon?: GraphNodeIconRenderer;
+  },
 ) {
   // GraphNode is registered with React Flow as a custom node type and receives
   // many props from the framework. For a smoke test we only need the subset
@@ -33,7 +39,9 @@ function renderNode(
   return render(
     <ReactFlowProvider>
       <GraphSettingsContext.Provider value={{ multiEdgeSpacing: 60 }}>
-        <NodeChromeContext.Provider value={options?.chrome ?? {}}>
+        <NodeChromeContext.Provider
+          value={{ ...options?.chrome, getNodeIcon: options?.getNodeIcon ?? options?.chrome?.getNodeIcon }}
+        >
           {/* @ts-expect-error — rendering the memoized node component directly */}
           <GraphNode {...props} />
         </NodeChromeContext.Provider>
@@ -159,5 +167,47 @@ describe('GraphNode', () => {
       x: expect.any(Number),
       y: expect.any(Number),
     }));
+  });
+
+  it('wraps the library icon in the icon slot by default', () => {
+    const { container } = renderNode(baseData);
+    expect(container.querySelector(`.${styles.icon} svg`)).toBeTruthy();
+  });
+
+  it('renders a client icon when getNodeIcon is provided', () => {
+    renderNode(baseData, {
+      getNodeIcon: () => <span>host-icon</span>,
+    });
+    expect(screen.getByText('host-icon')).toBeInTheDocument();
+  });
+
+  it('passes the simplified primary type and graph node to getNodeIcon', () => {
+    const getNodeIcon = vi.fn(() => <span>host-icon</span>);
+    renderNode(baseData, { getNodeIcon });
+    expect(getNodeIcon).toHaveBeenCalledWith('Drug', baseGraphNode);
+  });
+
+  it('uses the library icon when getNodeIcon returns null', () => {
+    const { container } = renderNode(baseData, { getNodeIcon: () => null });
+    expect(container.querySelector(`.${styles.icon} svg`)).toBeTruthy();
+    expect(screen.queryByText('host-icon')).not.toBeInTheDocument();
+  });
+
+  it('uses the library icon when getNodeIcon returns undefined', () => {
+    const { container } = renderNode(baseData, { getNodeIcon: () => undefined });
+    expect(container.querySelector(`.${styles.icon} svg`)).toBeTruthy();
+  });
+
+  it('hides the icon when getNodeIcon returns false', () => {
+    const { container } = renderNode(baseData, { getNodeIcon: () => false });
+    expect(container.querySelector('svg')).toBeFalsy();
+    expect(container.querySelector(`.${styles.icon}`)).toBeFalsy();
+  });
+
+  it('wraps a non-svg client icon in the icon slot', () => {
+    const { container } = renderNode(baseData, {
+      getNodeIcon: () => <img alt="host-icon" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />,
+    });
+    expect(container.querySelector(`.${styles.icon} img`)).toBeTruthy();
   });
 });

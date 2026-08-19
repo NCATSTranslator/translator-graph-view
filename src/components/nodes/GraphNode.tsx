@@ -88,15 +88,24 @@ function GraphNodeChromeSlots({
   );
 }
 
+function NodeTypeIcon({ icon }: { icon: ReactNode }) {
+  if (icon === false || icon === null || icon === undefined) {
+    return null;
+  }
+  return <span className={styles.icon}>{icon}</span>;
+}
+
 function GraphNodeComponent({ id, data, selected, isConnectable = true }: NodeProps) {
   const nodeData = data as GraphNodeData;
   const { hoverStyles } = useGraphSettings();
+  const { getNodeIcon } = useNodeChrome();
   const nodeRef = useRef<HTMLDivElement>(null);
   const nodeStyle = {
     '--node-color': nodeData.color,
   } as React.CSSProperties;
 
-  const nodeTypeIcon = getNodeTypeIcon(nodeData.primaryType);
+  const nodeTypeIcon = getNodeIcon?.(nodeData.primaryType, nodeData.graphNode)
+    ?? getNodeTypeIcon(nodeData.primaryType);
   const nodeLabel = (nodeData.primaryType === 'Gene' || nodeData.primaryType === 'Protein')
     ? nodeData.label.toUpperCase()
     : capitalizeAllWords(nodeData.label);
@@ -118,7 +127,7 @@ function GraphNodeComponent({ id, data, selected, isConnectable = true }: NodePr
     >
       <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
 
-      {nodeTypeIcon}
+      <NodeTypeIcon icon={nodeTypeIcon} />
 
       <div className={styles.label} title={nodeData.label}>
         {nodeLabel}
