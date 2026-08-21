@@ -157,7 +157,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
                 consumedFocusTokenRef={consumedFocusTokenRef}
               />
               <Background color="#ddd" gap={20} />
-              <Controls fitViewOptions={fitViewOptions} />
+              <Controls fitViewOptions={fitViewOptions} showInteractive={false} />
               {showMiniMap && (
                 <MiniMap
                   nodeColor={getMinimapNodeColor}
