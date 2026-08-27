@@ -130,6 +130,7 @@ The `GraphView` container must have a defined width and height.
 | `hoveredAnnotationId` | `string \| null` | - | Controlled hover: shows annotation hovered state (no dimming) |
 | `nodeHoverAnchor` | `HoverAnchorPosition` | `'topCenter'` | Anchor point returned in `HoverGeometry` for node hovers |
 | `edgeHoverAnchor` | `HoverAnchorPosition` | `'midpoint'` | Anchor point returned in `HoverGeometry` for edge hovers |
+| `clearHoverOnViewportChange` | `boolean` | `false` | Clear the hover when the viewport pans/zooms instead of re-measuring it every frame |
 | `selectedIds` | `string[]` | - | Controlled selection by node/edge ID |
 | `edgeType` | `EdgeType` | `'straight'` | Edge path style: `'bezier'`, `'straight'`, `'step'`, or `'smoothstep'` |
 | `showEdgeLabels` | `boolean` | `true` | Show predicate labels on edges |
@@ -362,6 +363,23 @@ import type { GraphNodeType, HoverGeometry } from 'translator-graph-view';
 When the hover callback fires with `null` (mouse leaves), `geometry` is also `null`. If DOM measurement fails (e.g. SSR), `geometry` is `null`.
 
 While the pointer stays over the same node or edge, geometry is **re-measured on pan and zoom** (throttled with `requestAnimationFrame`) so anchors stay aligned with the viewport.
+
+#### Clearing hover while the viewport moves
+
+Re-measuring calls your hover callback once per frame for as long as the gesture lasts. If your consumer stores the geometry in state, that is a re-render per frame, and any hover-driven dimming stays on — forcing the compositor to blend every dimmed element on every frame of the pan. On large graphs this makes a pan that starts over a node noticeably heavier than one that starts over empty space.
+
+Set `clearHoverOnViewportChange` to drop the hover instead. The callback fires once with `null` on the first frame of the gesture, tooltips and dimming clear, and nothing further fires until the pointer enters another element:
+
+```tsx
+<GraphView
+  data={data}
+  elkWorkerUrl="/elk-worker.min.js"
+  clearHoverOnViewportChange
+  onNodeHover={(node, geometry) => setHover(node ? { node, geometry } : null)}
+/>
+```
+
+Keep the default (`false`) if your tooltips are meant to track their element while the user pans.
 
 DOM queries are **scoped to this `GraphView` instance**, so multiple graphs on one page do not pick each other's elements. Element ids are escaped for attribute selectors (`CSS.escape` when available).
 
