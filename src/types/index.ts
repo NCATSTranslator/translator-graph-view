@@ -246,6 +246,14 @@ export interface GraphViewProps {
   hoveredAnnotationId?: string | null;
   nodeHoverAnchor?: HoverAnchorPosition;
   edgeHoverAnchor?: HoverAnchorPosition;
+  /**
+   * Clear the hover instead of re-measuring its geometry when the viewport pans
+   * or zooms. Hover callbacks fire once with `null` at the start of the gesture
+   * rather than once per frame, which drops both the per-frame work and the
+   * neighborhood dimming while the user is navigating. Hover resumes on the next
+   * pointer enter. Default false.
+   */
+  clearHoverOnViewportChange?: boolean;
   selectedIds?: string[];
   /** Pan/zoom the viewport to frame `nodeId`. Re-triggers when `token` changes. */
   focusRequest?: GraphFocusRequest | null;

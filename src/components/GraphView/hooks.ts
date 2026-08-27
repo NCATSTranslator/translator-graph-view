@@ -601,6 +601,8 @@ export interface UseHoverGeometryOptions {
   onEdgeHover?: (edge: GraphEdge | null, geometry: HoverGeometry | null) => void;
   onAnnotationHover?: (annotationId: string | null) => void;
   surfaceRef: React.RefObject<HTMLElement | null>;
+  /** Clear the hover on viewport change instead of re-measuring its geometry. */
+  clearHoverOnViewportChange?: boolean;
 }
 
 export interface HoverGeometryHandlers {
@@ -676,9 +678,47 @@ function measureTarget(
   }
 }
 
+/** Drop the tracked hover, notifying whichever callback owns it. */
+function clearTarget(refs: HoverRefs): void {
+  const prev = refs.hoverTarget.current;
+  if (!prev) return;
+  refs.hoverTarget.current = null;
+  if (prev.kind === 'annotation') refs.onAnnotationHover.current?.(null);
+  else if (prev.kind === 'node') refs.onNodeHover.current?.(null, null);
+  else refs.onEdgeHover.current?.(null, null);
+}
+
+/**
+ * Responds to viewport movement while something is hovered: either re-measures
+ * the anchor on the next frame, or drops the hover for the rest of the gesture.
+ */
+function useScheduleFlush(
+  refs: HoverRefs,
+  surfaceRef: UseHoverGeometryOptions['surfaceRef'],
+  clearHover: () => void,
+  clearHoverOnViewportChange: boolean,
+): () => void {
+  return useCallback(() => {
+    const target = refs.hoverTarget.current;
+    if (!target) return;
+    if (clearHoverOnViewportChange) {
+      clearHover();
+      return;
+    }
+    if (target.kind === 'annotation' || refs.raf.current !== null) return;
+    refs.raf.current = requestAnimationFrame(() => {
+      refs.raf.current = null;
+      const root = surfaceRef.current;
+      if (root) measureTarget(target, refs, root);
+    });
+  }, [refs, surfaceRef, clearHover, clearHoverOnViewportChange]);
+}
+
 /**
  * Tracks the currently hovered node/edge/annotation and re-measures geometry on
  * viewport changes via rAF, invoking hover callbacks with the updated anchor.
+ * With `clearHoverOnViewportChange`, the hover is dropped on the first frame of
+ * the gesture instead of being re-measured on every frame.
  */
 export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHandlers {
   const {
@@ -688,6 +728,7 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
     onEdgeHover,
     onAnnotationHover,
     surfaceRef,
+    clearHoverOnViewportChange = false,
   } = opts;
   const refs = useLiveHoverRefs(opts);
 
@@ -698,15 +739,17 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
     }
   }, [refs]);
 
-  const scheduleFlush = useCallback(() => {
-    const target = refs.hoverTarget.current;
-    if (!target || target.kind === 'annotation' || refs.raf.current !== null) return;
-    refs.raf.current = requestAnimationFrame(() => {
-      refs.raf.current = null;
-      const root = surfaceRef.current;
-      if (root) measureTarget(target, refs, root);
-    });
-  }, [refs, surfaceRef]);
+  const clearHover = useCallback(() => {
+    cancelFlush();
+    clearTarget(refs);
+  }, [cancelFlush, refs]);
+
+  const scheduleFlush = useScheduleFlush(
+    refs,
+    surfaceRef,
+    clearHover,
+    clearHoverOnViewportChange,
+  );
 
   useEffect(() => () => cancelFlush(), [cancelFlush]);
 
@@ -727,17 +770,6 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
     [onNodeHover, onAnnotationHover, nodeHoverAnchor, surfaceRef, refs],
   );
 
-  const handleNodeMouseLeave = useCallback(() => {
-    cancelFlush();
-    const prev = refs.hoverTarget.current;
-    refs.hoverTarget.current = null;
-    if (prev?.kind === 'annotation') {
-      if (onAnnotationHover) onAnnotationHover(null);
-      return;
-    }
-    if (onNodeHover) onNodeHover(null, null);
-  }, [onNodeHover, onAnnotationHover, cancelFlush, refs]);
-
   const handleEdgeMouseEnter = useCallback(
     (_e: React.MouseEvent, edge: Edge) => {
       if (!onEdgeHover) return;
@@ -749,17 +781,11 @@ export function useHoverGeometry(opts: UseHoverGeometryOptions): HoverGeometryHa
     [onEdgeHover, edgeHoverAnchor, surfaceRef, refs],
   );
 
-  const handleEdgeMouseLeave = useCallback(() => {
-    cancelFlush();
-    refs.hoverTarget.current = null;
-    if (onEdgeHover) onEdgeHover(null, null);
-  }, [onEdgeHover, cancelFlush, refs]);
-
   return {
     handleNodeMouseEnter,
-    handleNodeMouseLeave,
+    handleNodeMouseLeave: clearHover,
     handleEdgeMouseEnter,
-    handleEdgeMouseLeave,
+    handleEdgeMouseLeave: clearHover,
     scheduleFlush,
   };
 }

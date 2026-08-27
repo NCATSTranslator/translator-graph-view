@@ -6,7 +6,7 @@ import {
   type LayoutType,
   type Selection,
 } from '../src';
-import { smallGraph, mediumGraph } from './sampleData';
+import { smallGraph, mediumGraph, hugeGraph } from './sampleData';
 import { useTooltipDelay, useExampleData, useGraphHoverState, usePersistedAnnotations, usePersistedShowMiniMap } from './hooks';
 import {
   ToggleList,
@@ -17,12 +17,13 @@ import {
 } from './components';
 import styles from './App.module.css';
 
-type DatasetKey = 'small' | 'medium' | 'large';
+type DatasetKey = 'small' | 'medium' | 'large' | 'huge';
 
 const DATASETS: Array<{ label: string; value: DatasetKey }> = [
   { label: 'Small', value: 'small' },
   { label: 'Medium', value: 'medium' },
   { label: 'Large', value: 'large' },
+  { label: 'Huge', value: 'huge' },
 ];
 
 const LAYOUTS: Array<{ label: string; value: LayoutType }> = [
@@ -58,6 +59,7 @@ function resolveDataset(
 ): GraphData | null {
   if (dataset === 'small') return smallGraph;
   if (dataset === 'medium') return mediumGraph;
+  if (dataset === 'huge') return hugeGraph;
   return largeData;
 }
 
@@ -187,6 +189,7 @@ function App() {
           onEdgeHover={hover.handleEdgeHover}
           hoveredNodeId={sidebarHoveredNodeId}
           hoveredEdgeId={sidebarHoveredEdgeId}
+          clearHoverOnViewportChange={dataset === 'huge'}
           annotations={annotations}
           onAnnotationsChange={setAnnotations}
           nodeHoverAnchor="topCenter"
