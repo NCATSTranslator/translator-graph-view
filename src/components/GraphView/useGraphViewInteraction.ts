@@ -28,6 +28,7 @@ interface UseGraphViewInteractionOptions {
   onAnnotationHover?: (annotationId: string | null) => void;
   nodeHoverAnchor?: HoverAnchorPosition;
   edgeHoverAnchor?: HoverAnchorPosition;
+  clearHoverOnViewportChange?: boolean;
 }
 
 interface GraphViewInteractionState {
@@ -48,6 +49,7 @@ export function useGraphViewInteraction({
   onAnnotationHover,
   nodeHoverAnchor = 'topCenter',
   edgeHoverAnchor = 'midpoint',
+  clearHoverOnViewportChange,
 }: UseGraphViewInteractionOptions): GraphViewInteractionState {
   const { handleSelectionChange } = useSelection({ data, onSelectionChange });
 
@@ -64,6 +66,7 @@ export function useGraphViewInteraction({
     onEdgeHover,
     onAnnotationHover,
     surfaceRef: graphSurfaceRef,
+    clearHoverOnViewportChange,
   });
 
   useOnViewportChange({
