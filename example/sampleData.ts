@@ -74,3 +74,103 @@ export const mediumGraph: GraphData = {
     'e24': { id: 'e24', subject: 'n14', object: 'n7',  predicate: 'biolink:part_of' },
   },
 };
+
+const HUGE_NODE_TYPES = [
+  'biolink:Drug',
+  'biolink:Disease',
+  'biolink:Gene',
+  'biolink:Protein',
+  'biolink:PhenotypicFeature',
+  'biolink:ChemicalEntity',
+  'biolink:AnatomicalEntity',
+  'biolink:Pathway',
+] as const;
+
+const HUGE_PREDICATES = [
+  'biolink:treats',
+  'biolink:affects',
+  'biolink:interacts_with',
+  'biolink:regulates',
+  'biolink:associated_with',
+  'biolink:causes',
+  'biolink:inhibits',
+  'biolink:encodes',
+  'biolink:part_of',
+  'biolink:located_in',
+] as const;
+
+const HUGE_NODE_COUNT = 400;
+const HUGE_EDGE_COUNT = 1200;
+
+/** Deterministic PRNG so the huge graph is stable across reloads. */
+function mulberry32(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Synthetic graph for layout/render performance testing (~400 nodes, ~1200 edges).
+ * Built once at module load so dataset switches stay cheap.
+ */
+function buildHugeGraph(nodeCount: number, edgeCount: number, seed = 42): GraphData {
+  const rand = mulberry32(seed);
+  const nodes: GraphData['nodes'] = {};
+  const edges: GraphData['edges'] = {};
+  const nodeIds: string[] = [];
+
+  for (let i = 0; i < nodeCount; i++) {
+    const id = `huge-n${i}`;
+    const type = HUGE_NODE_TYPES[i % HUGE_NODE_TYPES.length];
+    const label = type.replace('biolink:', '');
+    nodes[id] = {
+      id,
+      names: [`${label} ${i}`],
+      types: [type],
+    };
+    nodeIds.push(id);
+  }
+
+  const seen = new Set<string>();
+  let edgeIndex = 0;
+
+  // Keep the graph connected with a spanning tree first.
+  for (let i = 1; i < nodeCount; i++) {
+    const subject = nodeIds[Math.floor(rand() * i)];
+    const object = nodeIds[i];
+    const key = `${subject}->${object}`;
+    seen.add(key);
+    const id = `huge-e${edgeIndex++}`;
+    edges[id] = {
+      id,
+      subject,
+      object,
+      predicate: HUGE_PREDICATES[edgeIndex % HUGE_PREDICATES.length],
+    };
+  }
+
+  while (edgeIndex < edgeCount) {
+    const subject = nodeIds[Math.floor(rand() * nodeCount)];
+    const object = nodeIds[Math.floor(rand() * nodeCount)];
+    if (subject === object) continue;
+    const key = `${subject}->${object}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const id = `huge-e${edgeIndex++}`;
+    edges[id] = {
+      id,
+      subject,
+      object,
+      predicate: HUGE_PREDICATES[edgeIndex % HUGE_PREDICATES.length],
+    };
+  }
+
+  return { nodes, edges };
+}
+
+export const hugeGraph: GraphData = buildHugeGraph(HUGE_NODE_COUNT, HUGE_EDGE_COUNT);
