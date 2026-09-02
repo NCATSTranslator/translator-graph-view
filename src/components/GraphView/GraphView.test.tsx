@@ -213,6 +213,122 @@ describe('GraphView', () => {
     expect(onNodeMenu).toHaveBeenCalledWith('a', { x: 42, y: 84 });
   });
 
+  it('reports a delete gesture through onSelectionDelete without removing anything itself', async () => {
+    const onSelectionDelete = vi.fn();
+    const { rerender } = render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        selectedIds={[]}
+        onSelectionDelete={onSelectionDelete}
+      />,
+    );
+    await screen.findByText('Aspirin');
+    rerender(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        selectedIds={['a', 'e1']}
+        onSelectionDelete={onSelectionDelete}
+      />,
+    );
+
+    fireEvent.keyDown(document, { key: 'Delete' });
+
+    await waitFor(() => expect(onSelectionDelete).toHaveBeenCalledTimes(1));
+    expect(onSelectionDelete).toHaveBeenCalledWith({
+      nodes: ['a'],
+      edges: ['e1'],
+    });
+    // Vetoed: the view keeps rendering `data` until the client drops the element.
+    expect(screen.getByText('Aspirin')).toBeInTheDocument();
+  });
+
+  it('reports a Backspace delete gesture the same way', async () => {
+    const onSelectionDelete = vi.fn();
+    render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        onSelectionDelete={onSelectionDelete}
+      />,
+    );
+    fireEvent.click(await screen.findByText('Aspirin'));
+
+    fireEvent.keyDown(document, { key: 'Backspace' });
+
+    await waitFor(() => expect(onSelectionDelete).toHaveBeenCalledTimes(1));
+    // Edges incident to a deleted node come along even when not selected themselves.
+    expect(onSelectionDelete).toHaveBeenCalledWith({
+      nodes: ['a'],
+      edges: ['e1'],
+    });
+  });
+
+  it('reports an edge-only selection without phantom nodes', async () => {
+    const onSelectionDelete = vi.fn();
+    const { rerender } = render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        selectedIds={[]}
+        onSelectionDelete={onSelectionDelete}
+      />,
+    );
+    await screen.findByText('Aspirin');
+    rerender(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        selectedIds={['e1']}
+        onSelectionDelete={onSelectionDelete}
+      />,
+    );
+
+    fireEvent.keyDown(document, { key: 'Delete' });
+
+    await waitFor(() => expect(onSelectionDelete).toHaveBeenCalledTimes(1));
+    expect(onSelectionDelete).toHaveBeenCalledWith({
+      nodes: [],
+      edges: ['e1'],
+    });
+  });
+
+  it('does not arm delete keys when onSelectionDelete is omitted', async () => {
+    render(<GraphView data={data} elkWorkerUrl="mock://elk" />);
+    fireEvent.click(await screen.findByText('Aspirin'));
+
+    fireEvent.keyDown(document, { key: 'Delete' });
+    fireEvent.keyDown(document, { key: 'Backspace' });
+
+    // Keys are null without a handler, so RF never runs deleteElements.
+    expect(screen.getByText('Aspirin')).toBeInTheDocument();
+    expect(screen.getByText('Headache')).toBeInTheDocument();
+    expect(screen.getByTestId('rf__node-a')).toHaveClass('selected');
+  });
+
+  it('ignores a delete gesture typed inside an annotation textarea', async () => {
+    const onSelectionDelete = vi.fn();
+    render(
+      <GraphView
+        data={data}
+        elkWorkerUrl="mock://elk"
+        annotations={[
+          { id: 'ann-1', text: 'Important note', position: { x: 50, y: 50 } },
+        ]}
+        onAnnotationsChange={vi.fn()}
+        onSelectionDelete={onSelectionDelete}
+      />,
+    );
+    await screen.findByDisplayValue('Important note');
+    fireEvent.click(screen.getByText('Aspirin'));
+    const textarea = screen.getByDisplayValue('Important note');
+
+    fireEvent.keyDown(textarea, { key: 'Backspace' });
+
+    expect(onSelectionDelete).not.toHaveBeenCalled();
+  });
+
   it('renders a client node icon when getNodeIcon is provided', async () => {
     render(
       <GraphView
