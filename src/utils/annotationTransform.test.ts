@@ -23,7 +23,6 @@ const sampleGraphNode: FlowGraphNode = {
     label: 'A',
     graphNode: { id: 'node-a', names: ['A'], types: ['biolink:Drug'] },
     primaryType: 'Drug',
-    color: '#000',
   },
 };
 

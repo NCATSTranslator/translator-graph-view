@@ -19,7 +19,7 @@ function makeFlowNode(id: string, selected: boolean): FlowNode {
     type: 'graphNode',
     position: { x: 0, y: 0 },
     selected,
-    data: { label: id, graphNode: data.nodes[id], primaryType: 'X', color: '#000' },
+    data: { label: id, graphNode: data.nodes[id], primaryType: 'X' },
   };
 }
 
