@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo } from 'react';
 
-import type { GraphNodeChrome, GraphNodeIconRenderer } from '../types';
+import type { GraphNodeChrome, GraphNodeColorRenderer, GraphNodeIconRenderer } from '../types';
 import { useStableCallback } from './useStableCallback';
 import { useStableValue } from './useStableValue';
 
@@ -9,6 +9,7 @@ export interface NodeChromeValue {
   onNodeRemove?: (nodeId: string) => void;
   onNodeMenu?: (nodeId: string, position: { x: number; y: number }) => void;
   getNodeIcon?: GraphNodeIconRenderer;
+  getNodeColor?: GraphNodeColorRenderer;
 }
 
 const defaults: NodeChromeValue = {};
@@ -29,11 +30,13 @@ export function useNodeChromeValue({
   onNodeRemove,
   onNodeMenu,
   getNodeIcon,
+  getNodeColor,
 }: NodeChromeValue): NodeChromeValue {
   const stableNodeChrome = useStableValue(nodeChrome, nodeChromeEqual);
   const stableOnNodeRemove = useStableCallback(onNodeRemove);
   const stableOnNodeMenu = useStableCallback(onNodeMenu);
   const stableGetNodeIcon = useStableCallback(getNodeIcon);
+  const stableGetNodeColor = useStableCallback(getNodeColor);
 
   return useMemo(
     () => ({
@@ -41,7 +44,14 @@ export function useNodeChromeValue({
       onNodeRemove: stableOnNodeRemove,
       onNodeMenu: stableOnNodeMenu,
       getNodeIcon: stableGetNodeIcon,
+      getNodeColor: stableGetNodeColor,
     }),
-    [stableGetNodeIcon, stableNodeChrome, stableOnNodeMenu, stableOnNodeRemove],
+    [
+      stableGetNodeColor,
+      stableGetNodeIcon,
+      stableNodeChrome,
+      stableOnNodeMenu,
+      stableOnNodeRemove,
+    ],
   );
 }

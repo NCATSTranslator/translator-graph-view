@@ -1,7 +1,13 @@
 import { memo, useMemo, useRef, type MouseEvent, type ReactNode, type RefObject } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { GraphNode as GraphNodeType, GraphNodeChromeContext, GraphNodeData } from '../../types';
-import { capitalizeAllWords, getNodeTypeIcon } from '../../utils/utils';
+import type {
+  GraphNode as GraphNodeType,
+  GraphNodeChromeContext,
+  GraphNodeColors,
+  GraphNodeData,
+} from '../../types';
+import { getNodeTypeIcon } from '../../utils/utils';
+import { getNodeDisplayLabel } from '../../utils/dataTransform';
 import { cn } from '../../utils/cn';
 import { useGraphSettings } from '../../hooks/useGraphSettings';
 import { useNodeChrome } from '../../hooks/useNodeChrome';
@@ -95,20 +101,35 @@ function NodeTypeIcon({ icon }: { icon: ReactNode }) {
   return <span className={styles.icon}>{icon}</span>;
 }
 
+/**
+ * Node custom properties. The background vars stay unset when the client
+ * supplies no color, which leaves the node on the stylesheet's default
+ * background.
+ */
+function nodeStyleFor(
+  colors: GraphNodeColors | null | undefined,
+): React.CSSProperties {
+  if (!colors) return {};
+  return {
+    '--tgv-node-bg': colors.background,
+    '--tgv-node-bg-hover': colors.hoverBackground ?? colors.background,
+  } as React.CSSProperties;
+}
+
 function GraphNodeComponent({ id, data, selected, isConnectable = true }: NodeProps) {
   const nodeData = data as GraphNodeData;
   const { hoverStyles } = useGraphSettings();
-  const { getNodeIcon } = useNodeChrome();
+  const { getNodeIcon, getNodeColor } = useNodeChrome();
   const nodeRef = useRef<HTMLDivElement>(null);
-  const nodeStyle = {
-    '--node-color': nodeData.color,
-  } as React.CSSProperties;
+  const nodeColors = getNodeColor?.(nodeData.primaryType, nodeData.graphNode);
+  const nodeStyle = useMemo(
+    () => nodeStyleFor(nodeColors),
+    [nodeColors?.background, nodeColors?.hoverBackground],
+  );
 
   const nodeTypeIcon = getNodeIcon?.(nodeData.primaryType, nodeData.graphNode)
     ?? getNodeTypeIcon(nodeData.primaryType);
-  const nodeLabel = (nodeData.primaryType === 'Gene' || nodeData.primaryType === 'Protein')
-    ? nodeData.label.toUpperCase()
-    : capitalizeAllWords(nodeData.label);
+  const nodeLabel = getNodeDisplayLabel(nodeData.label, nodeData.primaryType);
 
   const className = cn(
     styles.node,

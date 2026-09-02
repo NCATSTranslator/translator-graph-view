@@ -93,7 +93,6 @@ export interface GraphNodeData extends Record<string, unknown> {
   label: string;
   graphNode: GraphNode;
   primaryType: string;
-  color: string;
   selected?: boolean;
   hovered?: boolean;
   dimmed?: boolean;
@@ -161,6 +160,28 @@ export type GraphNodeIconRenderer = (
   type: string,
   node: GraphNode,
 ) => ReactNode | null | undefined;
+
+/** Background colors a client can assign to a single graph node. */
+export interface GraphNodeColors {
+  /** Resting background color. Any CSS color value. */
+  background: string;
+  /** Background color while hovered. Defaults to `background` when omitted. */
+  hoverBackground?: string;
+}
+
+/**
+ * Client color lookup for a graph node's background.
+ *
+ * `type` is the simplified primary type (e.g. `"Drug"`), not a Biolink CURIE.
+ * Full Biolink types are on `node.types`.
+ *
+ * Return `null` or `undefined` to leave the node on the library default
+ * background, which is what every node uses when no renderer is supplied.
+ */
+export type GraphNodeColorRenderer = (
+  type: string,
+  node: GraphNode,
+) => GraphNodeColors | null | undefined;
 
 /** Client-configurable hover / dim appearance. Built-in styles remain as defaults. */
 export interface GraphHoverStyles {
@@ -278,6 +299,12 @@ export interface GraphViewProps {
    * library default, or `false` to hide the icon.
    */
   getNodeIcon?: GraphNodeIconRenderer;
+  /**
+   * Client background-color lookup. `type` is the simplified primary type
+   * (e.g. `"Drug"`); full Biolink types are on `node.types`. Return
+   * `null`/`undefined` to leave the node on the library default background.
+   */
+  getNodeColor?: GraphNodeColorRenderer;
   /** Fires from node chrome `onRemove`. */
   onNodeRemove?: (nodeId: string) => void;
   /** Fires from node chrome `onMenu` or a node right-click, with the pointer position. */
