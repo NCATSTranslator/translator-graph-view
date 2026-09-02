@@ -9,11 +9,61 @@ import type {
   EdgeType,
   NodePositionMap,
 } from '../types';
-import { getColorForType, simplifyTypeName, getPrimaryType } from './colorGenerator';
+import { simplifyTypeName, getPrimaryType } from './colorGenerator';
+import { capitalizeAllWords } from './utils';
 
-// Default node dimensions
-export const NODE_WIDTH = 180;
-export const NODE_HEIGHT = 60;
+/**
+ * Node dimensions handed to the layout engine.
+ *
+ * These must track what GraphNode.module.scss actually paints, because ELK
+ * spaces nodes by their bounding boxes: a box wider or taller than the rendered
+ * node turns into gaps nobody asked for. The height is fixed by the 24px icon
+ * plus 4px of vertical padding; `NODE_WIDTH` is the fallback used when a label
+ * is unavailable, with `estimateNodeWidth` covering the normal case.
+ */
+export const NODE_WIDTH = 120;
+export const NODE_HEIGHT = 32;
+
+/** Matches min-width / max-width on `.node`. */
+export const NODE_MIN_WIDTH = 60;
+export const NODE_MAX_WIDTH = 200;
+
+/**
+ * Non-text width of a node: 8px horizontal padding on each side, the 24px icon,
+ * and 4px of label padding on each side.
+ */
+const NODE_CHROME_WIDTH = 48;
+
+/**
+ * Approximate advance width per character at the label's 12px/800 font. Mixed
+ * case runs narrower than the all-caps labels used for genes and proteins.
+ */
+const CHAR_WIDTH = 6.9;
+const CHAR_WIDTH_UPPERCASE = 8;
+
+/** Types whose labels GraphNode renders in all caps. */
+const UPPERCASE_TYPES = new Set(['Gene', 'Protein']);
+
+/**
+ * The label text as GraphNode renders it. Shared so that width estimates and
+ * the rendered node cannot drift apart.
+ */
+export function getNodeDisplayLabel(label: string, primaryType: string): string {
+  return UPPERCASE_TYPES.has(primaryType) ? label.toUpperCase() : capitalizeAllWords(label);
+}
+
+/**
+ * Estimated rendered width of a node, clamped to the same bounds the
+ * stylesheet enforces. Used as the node's layout box so that the configured
+ * spacing is the gap the user actually sees.
+ */
+export function estimateNodeWidth(label: string, primaryType: string): number {
+  if (!label) return NODE_WIDTH;
+  const text = getNodeDisplayLabel(label, primaryType);
+  const charWidth = UPPERCASE_TYPES.has(primaryType) ? CHAR_WIDTH_UPPERCASE : CHAR_WIDTH;
+  const width = NODE_CHROME_WIDTH + text.length * charWidth;
+  return Math.min(NODE_MAX_WIDTH, Math.max(NODE_MIN_WIDTH, Math.round(width)));
+}
 
 /**
  * Convert GraphData to ReactFlow nodes
@@ -24,14 +74,12 @@ export function transformNodesToFlow(
 ): FlowGraphNode[] {
   return Object.values(data.nodes).map((node) => {
     const primaryType = getPrimaryType(node.types);
-    const color = getColorForType(primaryType);
     const label = node.names[0] || node.id;
 
     const nodeData: GraphNodeData = {
       label,
       graphNode: node,
       primaryType: simplifyTypeName(primaryType),
-      color,
     };
 
     return {

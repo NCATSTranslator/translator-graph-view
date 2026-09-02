@@ -16,6 +16,10 @@ export {
   getEdgesById,
   NODE_WIDTH,
   NODE_HEIGHT,
+  NODE_MIN_WIDTH,
+  NODE_MAX_WIDTH,
+  estimateNodeWidth,
+  getNodeDisplayLabel,
 } from './dataTransform';
 
 export {
