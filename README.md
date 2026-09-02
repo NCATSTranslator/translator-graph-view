@@ -138,6 +138,7 @@ The `GraphView` container must have a defined width and height.
 | `showHandles` | `boolean` | `true` | Show connection handles on hover and allow connections |
 | `nodeChrome` | `GraphNodeChrome` | - | Client-rendered chrome at the top-left and bottom-right of each graph node |
 | `getNodeIcon` | `GraphNodeIconRenderer` | - | Client icon lookup; `null`/`undefined` uses the library default, `false` hides the icon |
+| `getNodeColor` | `GraphNodeColorRenderer` | - | Client background-color lookup; `null`/`undefined` keeps the default node background |
 | `onNodeRemove` | `(nodeId: string) => void` | - | Fires from node chrome `onRemove` |
 | `onNodeMenu` | `(nodeId: string, position: { x: number; y: number }) => void` | - | Fires from node chrome `onMenu` with a viewport position |
 | `multiEdgeSpacing` | `number` | `60` | Pixel spacing between parallel edges sharing the same node pair |
@@ -248,6 +249,50 @@ import { GraphView, getNodeTypeIcon } from 'translator-graph-view';
   }}
 />
 ```
+
+### Node spacing
+
+Layouts space nodes by their bounding boxes, so the boxes handed to ELK track
+what the stylesheet actually paints: `NODE_HEIGHT` is the real 32px node height,
+and each node's width comes from `estimateNodeWidth`, clamped to the stylesheet's
+own 60–200px bounds. A box larger than the painted node would reappear as gap the
+configured spacing never asked for.
+
+`layoutConfigs` therefore expresses spacing as the gap you actually see. Adjust
+those values to trade density against breathing room; note that the `radial`
+(stress) algorithm positions mainly by `elk.stress.desiredEdgeLength` and largely
+ignores `elk.spacing.nodeNode`.
+
+### Node colors
+
+Pass `getNodeColor` to set a node's background from its type. Like `getNodeIcon`,
+the first argument is the **simplified primary type** (for example `"Drug"`), not
+a Biolink CURIE; full types are on `node.types`.
+
+- Return `{ background, hoverBackground }` to color the node.
+- Omit `hoverBackground` to reuse `background` on hover.
+- Return `null` or `undefined` to leave that node on the default background.
+
+With no renderer supplied, every node keeps the default `#DCDCE6` background, so
+adding the prop is opt-in per node. Colors are applied as the `--tgv-node-bg` and
+`--tgv-node-bg-hover` custom properties, and the hover background also applies
+when a node is hovered externally via `hoveredNodeId`.
+
+```tsx
+const typeColors: Record<string, { background: string; hoverBackground: string }> = {
+  Drug: { background: '#DCE9FF', hoverBackground: '#C4DAFF' },
+  Disease: { background: '#FFE0E0', hoverBackground: '#FFC9C9' },
+};
+
+<GraphView
+  data={data}
+  elkWorkerUrl={elkWorkerUrl}
+  getNodeColor={(type) => typeColors[type] ?? null}
+/>
+```
+
+The library keeps the callback identity stable, so an inline `getNodeColor` does
+not re-render edges or annotations.
 
 ### Interaction Model
 
@@ -536,13 +581,16 @@ type GraphNodeIconRenderer = (
 | `formatPredicate(predicate)` | Format a predicate for display (`"biolink:treats"` → `"treats"`) |
 | `getNodesById(data, ids)` | Look up nodes by ID array |
 | `getEdgesById(data, ids)` | Look up edges by ID array |
-| `NODE_WIDTH` / `NODE_HEIGHT` | Default node dimensions used by the layout engine (180×60) |
+| `NODE_WIDTH` / `NODE_HEIGHT` | Fallback node dimensions used by the layout engine (120×32) |
+| `NODE_MIN_WIDTH` / `NODE_MAX_WIDTH` | Width bounds the node stylesheet enforces (60 / 200) |
+| `getNodeDisplayLabel(label, type)` | The label text as rendered (all caps for `Gene`/`Protein`, otherwise title case) |
+| `estimateNodeWidth(label, type)` | Estimated rendered node width, used as the node's layout box |
 
 ### Exported Types
 
 All TypeScript types are exported for consumer use:
 
-`GraphData`, `GraphNodeType`, `GraphEdgeType`, `GraphViewProps`, `LayoutType`, `EdgeType`, `Selection`, `Result`, `Path`, `Publication`, `Trial`, `Provenance`, `GraphNodeData`, `GraphEdgeData`, `FlowNode`, `FlowGraphNode`, `FlowAnnotationNode`, `FlowEdge`, `HoverAnchorPosition`, `HoverGeometry`, `GraphAnnotation`, `GraphAnnotationStyles`, `GraphHoverStyles`, `GraphNodeChrome`, `GraphNodeChromeContext`
+`GraphData`, `GraphNodeType`, `GraphEdgeType`, `GraphViewProps`, `LayoutType`, `EdgeType`, `Selection`, `Result`, `Path`, `Publication`, `Trial`, `Provenance`, `GraphNodeData`, `GraphEdgeData`, `FlowNode`, `FlowGraphNode`, `FlowAnnotationNode`, `FlowEdge`, `HoverAnchorPosition`, `HoverGeometry`, `GraphAnnotation`, `GraphAnnotationStyles`, `GraphHoverStyles`, `GraphNodeChrome`, `GraphNodeChromeContext`, `GraphNodeColors`, `GraphNodeColorRenderer`
 
 ## Development
 

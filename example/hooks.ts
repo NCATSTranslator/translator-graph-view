@@ -9,6 +9,7 @@ import type {
 
 const ANNOTATIONS_STORAGE_PREFIX = 'translator-graph-view:annotations:';
 const SHOW_MINIMAP_STORAGE_KEY = 'translator-graph-view:showMiniMap';
+const COLOR_MODE_STORAGE_KEY = 'translator-graph-view:colorMode';
 
 interface LocalStorageOptions<T> {
   read: (key: string) => T;
@@ -43,7 +44,8 @@ function useLocalStorage<T>(
   return [state, setValue];
 }
 
-function readShowMiniMap(key: string): boolean {
+/** Persisted booleans default to on; only an explicit "false" turns them off. */
+function readFlag(key: string): boolean {
   try {
     return localStorage.getItem(key) !== 'false';
   } catch {
@@ -51,20 +53,23 @@ function readShowMiniMap(key: string): boolean {
   }
 }
 
-function writeShowMiniMap(key: string, show: boolean): void {
-  localStorage.setItem(key, String(show));
+function writeFlag(key: string, value: boolean): void {
+  localStorage.setItem(key, String(value));
 }
 
-export function usePersistedShowMiniMap(): {
+const flagStorage = { read: readFlag, write: writeFlag };
+
+/** The display toggles that survive a reload, both defaulting to on. */
+export function usePersistedDisplaySettings(): {
   showMiniMap: boolean;
   setShowMiniMap: (show: boolean) => void;
+  colorMode: boolean;
+  setColorMode: (enabled: boolean) => void;
 } {
-  const [showMiniMap, setShowMiniMap] = useLocalStorage(SHOW_MINIMAP_STORAGE_KEY, {
-    read: readShowMiniMap,
-    write: writeShowMiniMap,
-  });
+  const [showMiniMap, setShowMiniMap] = useLocalStorage(SHOW_MINIMAP_STORAGE_KEY, flagStorage);
+  const [colorMode, setColorMode] = useLocalStorage(COLOR_MODE_STORAGE_KEY, flagStorage);
 
-  return { showMiniMap, setShowMiniMap };
+  return { showMiniMap, setShowMiniMap, colorMode, setColorMode };
 }
 
 function readAnnotations(key: string): GraphAnnotation[] {

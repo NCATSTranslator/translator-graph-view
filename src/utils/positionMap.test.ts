@@ -14,7 +14,6 @@ const graphNode: FlowGraphNode = {
     label: 'A',
     graphNode: { id: 'a', names: ['A'], types: ['biolink:Drug'] },
     primaryType: 'Drug',
-    color: '#000',
   },
 };
 

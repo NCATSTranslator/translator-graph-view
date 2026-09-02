@@ -3,7 +3,7 @@ import ELK from 'elkjs/lib/elk-api.js';
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs';
 import type { FlowGraphNode, FlowEdge, LayoutType, NodePositionMap } from '../types';
 import { getLayoutOptions } from '../layouts';
-import { NODE_WIDTH, NODE_HEIGHT } from '../utils';
+import { NODE_HEIGHT, estimateNodeWidth } from '../utils';
 import { flowGraphNodesToPositionMap } from '../utils/positionMap';
 
 interface UseGraphLayoutOptions {
@@ -34,7 +34,7 @@ function toElkLayoutOptions(options: ReturnType<typeof getLayoutOptions>): Layou
 function buildElkGraph(nodes: FlowGraphNode[], edges: FlowEdge[], layout: LayoutType): ElkNode {
   const elkNodes: ElkNode[] = nodes.map((node) => ({
     id: node.id,
-    width: NODE_WIDTH,
+    width: estimateNodeWidth(node.data.label, node.data.primaryType),
     height: NODE_HEIGHT,
   }));
   const elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({

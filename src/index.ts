@@ -63,6 +63,8 @@ export type {
   GraphNodeChrome,
   GraphNodeChromeContext,
   GraphNodeIconRenderer,
+  GraphNodeColors,
+  GraphNodeColorRenderer,
   NodePosition,
   NodePositionMap,
   FitViewPadding,

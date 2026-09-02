@@ -5,7 +5,13 @@ import { GraphNode } from './GraphNode';
 import styles from './GraphNode.module.scss';
 import { GraphSettingsContext } from '../../hooks/useGraphSettings';
 import { NodeChromeContext, type NodeChromeValue } from '../../hooks/useNodeChrome';
-import type { GraphNodeData, GraphNode as GraphNodeType, GraphNodeIconRenderer } from '../../types';
+import { NODE_HEIGHT, NODE_WIDTH } from '../../utils/dataTransform';
+import type {
+  GraphNodeData,
+  GraphNode as GraphNodeType,
+  GraphNodeColorRenderer,
+  GraphNodeIconRenderer,
+} from '../../types';
 
 function renderNode(
   data: GraphNodeData,
@@ -14,6 +20,7 @@ function renderNode(
     isConnectable?: boolean;
     chrome?: NodeChromeValue;
     getNodeIcon?: GraphNodeIconRenderer;
+    getNodeColor?: GraphNodeColorRenderer;
   },
 ) {
   // GraphNode is registered with React Flow as a custom node type and receives
@@ -31,22 +38,61 @@ function renderNode(
     positionAbsoluteX: 0,
     positionAbsoluteY: 0,
     zIndex: 0,
-    width: 180,
-    height: 60,
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
     sourcePosition: 'bottom',
     targetPosition: 'top',
+  };
+  const chromeValue: NodeChromeValue = {
+    ...options?.chrome,
+    getNodeIcon: options?.getNodeIcon ?? options?.chrome?.getNodeIcon,
+    getNodeColor: options?.getNodeColor ?? options?.chrome?.getNodeColor,
   };
   return render(
     <ReactFlowProvider>
       <GraphSettingsContext.Provider value={{ multiEdgeSpacing: 60 }}>
-        <NodeChromeContext.Provider
-          value={{ ...options?.chrome, getNodeIcon: options?.getNodeIcon ?? options?.chrome?.getNodeIcon }}
-        >
+        <NodeChromeContext.Provider value={chromeValue}>
           {/* @ts-expect-error — rendering the memoized node component directly */}
           <GraphNode {...props} />
         </NodeChromeContext.Provider>
       </GraphSettingsContext.Provider>
     </ReactFlowProvider>,
+  );
+}
+
+function NodeWithColorChrome({
+  data,
+  getNodeColor,
+}: {
+  data: GraphNodeData;
+  getNodeColor?: GraphNodeColorRenderer;
+}) {
+  const props = {
+    id: 'n1',
+    type: 'graphNode',
+    data,
+    selected: false,
+    dragging: false,
+    isConnectable: true,
+    xPos: 0,
+    yPos: 0,
+    positionAbsoluteX: 0,
+    positionAbsoluteY: 0,
+    zIndex: 0,
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
+    sourcePosition: 'bottom',
+    targetPosition: 'top',
+  };
+  return (
+    <ReactFlowProvider>
+      <GraphSettingsContext.Provider value={{ multiEdgeSpacing: 60 }}>
+        <NodeChromeContext.Provider value={{ getNodeColor }}>
+          {/* @ts-expect-error — rendering the memoized node component directly */}
+          <GraphNode {...props} />
+        </NodeChromeContext.Provider>
+      </GraphSettingsContext.Provider>
+    </ReactFlowProvider>
   );
 }
 
@@ -60,7 +106,6 @@ const baseData: GraphNodeData = {
   label: 'aspirin',
   graphNode: baseGraphNode,
   primaryType: 'Drug',
-  color: '#0000FF',
 };
 
 describe('GraphNode', () => {
@@ -69,7 +114,6 @@ describe('GraphNode', () => {
       label: 'type ii diabetes',
       graphNode: { ...baseGraphNode, names: ['type ii diabetes'], types: ['biolink:Disease'] },
       primaryType: 'Disease',
-      color: '#FF0000',
     });
     expect(screen.getByText('Type II Diabetes')).toBeInTheDocument();
   });
@@ -79,7 +123,6 @@ describe('GraphNode', () => {
       label: 'brca1',
       graphNode: { ...baseGraphNode, names: ['brca1'], types: ['biolink:Gene'] },
       primaryType: 'Gene',
-      color: '#00FF00',
     });
     expect(screen.getByText('BRCA1')).toBeInTheDocument();
   });
@@ -209,5 +252,56 @@ describe('GraphNode', () => {
       getNodeIcon: () => <img alt="host-icon" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />,
     });
     expect(container.querySelector(`.${styles.icon} img`)).toBeTruthy();
+  });
+  it('leaves the background vars unset when no getNodeColor is supplied', () => {
+    const { container } = renderNode(baseData);
+    const node = container.querySelector(`.${styles.node}`) as HTMLElement;
+    expect(node.style.getPropertyValue('--tgv-node-bg')).toBe('');
+    expect(node.style.getPropertyValue('--tgv-node-bg-hover')).toBe('');
+  });
+
+  it('passes the simplified primary type and graph node to getNodeColor', () => {
+    const getNodeColor = vi.fn(() => ({ background: '#FFEEDD' }));
+    renderNode(baseData, { getNodeColor });
+    expect(getNodeColor).toHaveBeenCalledWith('Drug', baseGraphNode);
+  });
+
+  it('sets both background vars from getNodeColor', () => {
+    const { container } = renderNode(baseData, {
+      getNodeColor: () => ({ background: '#FFEEDD', hoverBackground: '#CCBBAA' }),
+    });
+    const node = container.querySelector(`.${styles.node}`) as HTMLElement;
+    expect(node.style.getPropertyValue('--tgv-node-bg')).toBe('#FFEEDD');
+    expect(node.style.getPropertyValue('--tgv-node-bg-hover')).toBe('#CCBBAA');
+  });
+
+  it('falls back to the resting background when hoverBackground is omitted', () => {
+    const { container } = renderNode(baseData, {
+      getNodeColor: () => ({ background: '#FFEEDD' }),
+    });
+    const node = container.querySelector(`.${styles.node}`) as HTMLElement;
+    expect(node.style.getPropertyValue('--tgv-node-bg-hover')).toBe('#FFEEDD');
+  });
+
+  it('leaves the background vars unset when getNodeColor returns null', () => {
+    const { container } = renderNode(baseData, { getNodeColor: () => null });
+    const node = container.querySelector(`.${styles.node}`) as HTMLElement;
+    expect(node.style.getPropertyValue('--tgv-node-bg')).toBe('');
+  });
+
+  it('clears background vars when getNodeColor is removed on rerender', () => {
+    const getNodeColor = () => ({ background: '#FFEEDD' });
+    const { container, rerender } = render(
+      <NodeWithColorChrome data={baseData} getNodeColor={getNodeColor} />,
+    );
+
+    let node = container.querySelector(`.${styles.node}`) as HTMLElement;
+    expect(node.style.getPropertyValue('--tgv-node-bg')).toBe('#FFEEDD');
+
+    rerender(<NodeWithColorChrome data={baseData} />);
+
+    node = container.querySelector(`.${styles.node}`) as HTMLElement;
+    expect(node.style.getPropertyValue('--tgv-node-bg')).toBe('');
+    expect(node.style.getPropertyValue('--tgv-node-bg-hover')).toBe('');
   });
 });

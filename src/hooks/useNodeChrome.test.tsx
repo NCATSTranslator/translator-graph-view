@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { NodeChromeContext, useNodeChrome, useNodeChromeValue } from './useNodeChrome';
+import type { GraphNodeColorRenderer } from '../types';
 
 describe('useNodeChrome', () => {
   it('returns empty defaults when no provider is present', () => {
@@ -10,6 +11,7 @@ describe('useNodeChrome', () => {
     expect(result.current.onNodeRemove).toBeUndefined();
     expect(result.current.onNodeMenu).toBeUndefined();
     expect(result.current.getNodeIcon).toBeUndefined();
+    expect(result.current.getNodeColor).toBeUndefined();
   });
 
   it('returns the provider value when wrapped', () => {
@@ -31,6 +33,7 @@ describe('useNodeChromeValue', () => {
     expect(result.current.onNodeRemove).toBeUndefined();
     expect(result.current.onNodeMenu).toBeUndefined();
     expect(result.current.getNodeIcon).toBeUndefined();
+    expect(result.current.getNodeColor).toBeUndefined();
   });
 
   it('keeps callback identities stable when parent handlers change', () => {
@@ -98,5 +101,35 @@ describe('useNodeChromeValue', () => {
     expect(result.current.getNodeIcon).toBeTypeOf('function');
     rerender({ getNodeIcon: undefined });
     expect(result.current.getNodeIcon).toBeUndefined();
+  });
+
+  it('keeps getNodeColor identity and the context value stable when the parent renderer changes', () => {
+    const { result, rerender } = renderHook(
+      ({ getNodeColor }: { getNodeColor: GraphNodeColorRenderer }) =>
+        useNodeChromeValue({ getNodeColor }),
+      { initialProps: { getNodeColor: (() => ({ background: '#fff' })) as GraphNodeColorRenderer } },
+    );
+
+    const firstValue = result.current;
+    const firstColor = result.current.getNodeColor;
+    const latest = vi.fn(() => ({ background: '#000' }));
+    rerender({ getNodeColor: latest as GraphNodeColorRenderer });
+
+    expect(result.current).toBe(firstValue);
+    expect(result.current.getNodeColor).toBe(firstColor);
+    result.current.getNodeColor?.('Drug', { id: 'n1', names: [], types: [] });
+    expect(latest).toHaveBeenCalledWith('Drug', { id: 'n1', names: [], types: [] });
+  });
+
+  it('drops getNodeColor when the parent omits it', () => {
+    const { result, rerender } = renderHook(
+      ({ getNodeColor }: { getNodeColor?: GraphNodeColorRenderer }) =>
+        useNodeChromeValue({ getNodeColor }),
+      { initialProps: { getNodeColor: (() => ({ background: '#fff' })) as GraphNodeColorRenderer | undefined } },
+    );
+
+    expect(result.current.getNodeColor).toBeTypeOf('function');
+    rerender({ getNodeColor: undefined });
+    expect(result.current.getNodeColor).toBeUndefined();
   });
 });
