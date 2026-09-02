@@ -48,6 +48,8 @@ const panOnDrag: number[] = [1, 2];
 
 const proOptions = { hideAttribution: true };
 
+const deleteKeyCode = ['Delete', 'Backspace'];
+
 const minimapNodeColor = '#888';
 
 function getMinimapNodeColor(node: Node): string {
@@ -68,6 +70,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
     fitViewPadding = DEFAULT_FIT_VIEW_PADDING,
     layout,
     viewportSyncKey,
+    onSelectionDelete,
   } = props;
   const {
     isLayouting,
@@ -85,6 +88,7 @@ function GraphViewInner(props: GraphViewInnerProps) {
     hoverHandlers,
     handleNodeClick,
     handleEdgeClick,
+    handleBeforeDelete,
     consumedFocusTokenRef,
   } = useGraphViewState(props);
 
@@ -126,6 +130,8 @@ function GraphViewInner(props: GraphViewInnerProps) {
               onEdgeMouseLeave={hoverHandlers.handleEdgeMouseLeave}
               onNodeDragStop={handleNodeDragStop}
               onSelectionChange={handleSelectionChange}
+              onBeforeDelete={handleBeforeDelete}
+              deleteKeyCode={onSelectionDelete ? deleteKeyCode : null}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               defaultEdgeOptions={defaultEdgeOptions}

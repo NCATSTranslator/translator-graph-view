@@ -120,6 +120,7 @@ The `GraphView` container must have a defined width and height.
 | `elkWorkerUrl` | `string` | required | URL to the ELKjs web worker script (see below) |
 | `layout` | `LayoutType` | `'hierarchical'` | Layout algorithm |
 | `onSelectionChange` | `(selection: Selection) => void` | - | Fires when selection changes |
+| `onSelectionDelete` | `(selection: DeleteSelection) => void` | - | Fires on Delete/Backspace with a selection; the view never removes anything itself (see below) |
 | `onNodeClick` | `(node: GraphNode) => void` | - | Fires when a node is clicked |
 | `onEdgeClick` | `(edge: GraphEdge) => void` | - | Fires when an edge is clicked |
 | `onNodeHover` | `(node: GraphNode \| null, geometry: HoverGeometry \| null) => void` | - | Fires when a node is hovered or unhovered |
@@ -303,10 +304,36 @@ The graph supports the following built-in interactions:
 | Left-click node/edge | Select it |
 | Shift+Click | Add to selection |
 | Drag from empty area | Box selection (partial overlap) |
+| Delete / Backspace | Report the selection through `onSelectionDelete` |
 | Middle/right-button drag | Pan the viewport |
 | Scroll | Zoom in/out (0.15x to 3x) |
 | MiniMap drag | Pan the viewport |
 | MiniMap scroll | Zoom |
+
+### Deleting a selection
+
+Pressing <kbd>Delete</kbd> or <kbd>Backspace</kbd> with elements selected calls
+`onSelectionDelete` and nothing else — the view never drops the elements from its own
+state. Its nodes and edges mirror the `data` prop, so an internal delete would leave the
+two out of step until the next `data` change put the element back. Remove the reported
+ids from `data` to make the deletion stick, which also leaves undo entirely in the
+client's hands. Delete keys are only armed when `onSelectionDelete` is provided.
+
+```tsx
+<GraphView
+  data={data}
+  elkWorkerUrl="/elk-worker.min.js"
+  onSelectionDelete={({ nodes, edges }) => removeFromMyStore(nodes, edges)}
+/>
+```
+
+`edges` includes every edge incident to a deleted node, not only the edges the user
+selected. That differs from node-chrome `onNodeRemove`, which reports a single node id
+and does not include incident edges — wire both if your UI exposes chrome remove and
+keyboard delete, and expand edges yourself for the chrome path if you need parity.
+
+Keystrokes typed inside an input, textarea, or contenteditable — annotation text
+editing included — never trigger it.
 
 ### Hover
 
@@ -590,7 +617,7 @@ type GraphNodeIconRenderer = (
 
 All TypeScript types are exported for consumer use:
 
-`GraphData`, `GraphNodeType`, `GraphEdgeType`, `GraphViewProps`, `LayoutType`, `EdgeType`, `Selection`, `Result`, `Path`, `Publication`, `Trial`, `Provenance`, `GraphNodeData`, `GraphEdgeData`, `FlowNode`, `FlowGraphNode`, `FlowAnnotationNode`, `FlowEdge`, `HoverAnchorPosition`, `HoverGeometry`, `GraphAnnotation`, `GraphAnnotationStyles`, `GraphHoverStyles`, `GraphNodeChrome`, `GraphNodeChromeContext`, `GraphNodeColors`, `GraphNodeColorRenderer`
+`GraphData`, `GraphNodeType`, `GraphEdgeType`, `GraphViewProps`, `LayoutType`, `EdgeType`, `Selection`, `DeleteSelection`, `Result`, `Path`, `Publication`, `Trial`, `Provenance`, `GraphNodeData`, `GraphEdgeData`, `FlowNode`, `FlowGraphNode`, `FlowAnnotationNode`, `FlowEdge`, `HoverAnchorPosition`, `HoverGeometry`, `GraphAnnotation`, `GraphAnnotationStyles`, `GraphHoverStyles`, `GraphNodeChrome`, `GraphNodeChromeContext`, `GraphNodeColors`, `GraphNodeColorRenderer`
 
 ## Development
 
