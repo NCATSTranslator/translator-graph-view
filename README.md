@@ -17,7 +17,7 @@ Renders [Biolink Model](https://biolink.github.io/biolink-model/) knowledge grap
 - **Predicate labels** — edge labels extracted from Biolink predicates with optional show/hide
 - **Edge path styles** — bezier, straight, step, and smoothstep path options
 - **MiniMap and zoom controls** — zoomable/pannable minimap with neutral node dots
-- **Draggable graph annotations** — parent-controlled text notes with editable content, hover delete controls, configurable styling, and savable graph-space positions
+- **Draggable graph annotations** — parent-controlled text notes with editable content, clickable links, hover delete controls, configurable styling, and savable graph-space positions
 - **Node chrome** — optional client-rendered hover controls at the node corners, with `onNodeRemove` / `onNodeMenu` callbacks
 - **Optional connection handles** — hide and disable node connection handles via `showHandles`
 - **Smart text formatting** — gene/protein names uppercased, other names title-cased, Roman numerals detected and preserved
@@ -145,7 +145,7 @@ The `GraphView` container must have a defined width and height.
 | `multiEdgeSpacing` | `number` | `60` | Pixel spacing between parallel edges sharing the same node pair |
 | `annotations` | `GraphAnnotation[]` | - | Controlled annotation overlays (positions in graph coordinates) |
 | `onAnnotationsChange` | `(annotations: GraphAnnotation[]) => void` | - | Fires when an annotation is dragged, edited, or deleted |
-| `annotationStyles` | `GraphAnnotationStyles` | - | Client-configurable annotation appearance (background, delete button, icons) |
+| `annotationStyles` | `GraphAnnotationStyles` | - | Client-configurable annotation appearance (background, delete button, icons, link rendering) |
 | `hoverStyles` | `GraphHoverStyles` | - | Client-configurable hover / dim appearance (opacity, classNames) |
 | `className` | `string` | - | Additional CSS class for the container |
 
@@ -194,7 +194,24 @@ function App() {
 }
 ```
 
-Each annotation shows as an editable text box with a pale yellow background by default. On hover, a delete button appears in the top-left corner (white circle with an X icon by default). Override colors, CSS classes, and the delete icon via `annotationStyles`.
+Each annotation shows as a text note with a pale yellow background by default. On hover, a delete button appears in the top-left corner (white circle with an X icon by default). Override colors, CSS classes, and the delete icon via `annotationStyles`.
+
+Annotations have two faces. At rest a note renders as static text with its links clickable; clicking the note (anywhere but a link) swaps in a textarea with the caret where you clicked, and blurring commits. `Escape` leaves edit mode and discards the draft. Read-only annotations never enter edit mode, but their links still work.
+
+#### Links in annotation text
+
+Annotation text is plain text; the display view turns three forms into anchors:
+
+| Typed | Renders as |
+| --- | --- |
+| `https://example.com/x` | the URL, linked (trailing sentence punctuation stays outside the link) |
+| `www.example.com` | the text, linked to `https://www.example.com` |
+| `curator@example.org` | the address, linked to `mailto:` |
+| `[the paper](https://example.com/p)` | `the paper`, linked |
+
+Links open in a new tab with `rel="noopener noreferrer"`. Only `http`, `https`, and `mailto` targets are linked — anything else (`javascript:`, `data:`, and so on) renders as the literal text the user typed. Nothing is ever parsed as HTML: anchors are built from a token stream, so markup in annotation text stays inert text.
+
+Set `annotationStyles.linkify: false` to render annotation text verbatim, and `annotationStyles.linkClassName` to style the generated anchors.
 
 `onAnnotationsChange` fires when:
 - the user finishes dragging an annotation (`onNodeDragStop`)
@@ -565,6 +582,8 @@ interface GraphAnnotationStyles {
     className?: string;
     icon?: React.ReactNode;
   };
+  linkify?: boolean;        // default true
+  linkClassName?: string;
 }
 
 interface GraphNodeChromeContext {

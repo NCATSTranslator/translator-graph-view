@@ -1,12 +1,12 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import type { GraphAnnotationData } from '../../types';
 import { useAnnotationActions } from '../../hooks/useAnnotationActions';
 import { useGraphSettings } from '../../hooks/useGraphSettings';
 import { cn } from '../../utils/cn';
+import { AnnotationDisplay } from './AnnotationDisplay';
+import { AnnotationEditor } from './AnnotationEditor';
 import styles from './GraphAnnotationNode.module.scss';
-
-const MIN_TEXTAREA_HEIGHT = 48;
 
 function DefaultDeleteIcon() {
   return (
@@ -26,11 +26,6 @@ function DefaultDeleteIcon() {
 }
 
 export const DEFAULT_PLACEHOLDER = 'Add an annotation...';
-
-function syncTextareaHeight(textarea: HTMLTextAreaElement): void {
-  textarea.style.height = 'auto';
-  textarea.style.height = `${Math.max(MIN_TEXTAREA_HEIGHT, textarea.scrollHeight)}px`;
-}
 
 function optionalBackground(color?: string): React.CSSProperties | undefined {
   return color ? { backgroundColor: color } : undefined;
@@ -77,42 +72,30 @@ function annotationNodeClassName(
   );
 }
 
+/** Null while the annotation shows its display view, else where the caret goes. */
+type EditState = { caret: number | null } | null;
+
 function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
   const nodeData = data as GraphAnnotationData;
   const { annotationStyles, hoverStyles } = useGraphSettings();
   const { onTextChange, onDelete, readOnly } = useAnnotationActions();
-  const [text, setText] = useState(nodeData.text);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [edit, setEdit] = useState<EditState>(null);
 
-  useEffect(() => {
-    if (document.activeElement === textareaRef.current) return;
-    setText(nodeData.text);
-  }, [nodeData.text]);
+  const stopEditing = useCallback(() => setEdit(null), []);
 
-  useLayoutEffect(() => {
-    if (textareaRef.current) {
-      syncTextareaHeight(textareaRef.current);
-    }
-  }, [text]);
+  const startEditing = useCallback((caret: number | null) => {
+    if (!readOnly) setEdit({ caret });
+  }, [readOnly]);
 
-  const handleChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(event.target.value);
-    syncTextareaHeight(event.target);
-  }, []);
+  const commit = useCallback((text: string) => {
+    setEdit(null);
+    if (text !== nodeData.text) onTextChange(id, text);
+  }, [id, nodeData.text, onTextChange]);
 
-  const handleBlur = useCallback(() => {
-    if (!readOnly && text !== nodeData.text) {
-      onTextChange(id, text);
-    }
-  }, [id, nodeData.text, onTextChange, readOnly, text]);
-
-  const handleDelete = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      onDelete(id);
-    },
-    [id, onDelete],
-  );
+  const handleDelete = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    onDelete(id);
+  }, [id, onDelete]);
 
   return (
     <div
@@ -133,16 +116,24 @@ function GraphAnnotationNodeComponent({ id, data }: NodeProps) {
           onDelete={handleDelete}
         />
       )}
-      <div className={styles.sizer}>{text || DEFAULT_PLACEHOLDER}</div>
-      <textarea
-        ref={textareaRef}
-        className={cn(styles.textarea, 'nodrag', 'nopan')}
-        value={text}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        placeholder={DEFAULT_PLACEHOLDER}
-        readOnly={readOnly}
-      />
+      {edit ? (
+        <AnnotationEditor
+          initialText={nodeData.text}
+          initialCaret={edit.caret}
+          placeholder={DEFAULT_PLACEHOLDER}
+          onCommit={commit}
+          onCancel={stopEditing}
+        />
+      ) : (
+        <AnnotationDisplay
+          text={nodeData.text}
+          placeholder={DEFAULT_PLACEHOLDER}
+          linkify={annotationStyles?.linkify !== false}
+          linkClassName={annotationStyles?.linkClassName}
+          readOnly={readOnly}
+          onStartEditing={startEditing}
+        />
+      )}
     </div>
   );
 }

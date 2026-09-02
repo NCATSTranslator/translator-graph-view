@@ -6,6 +6,7 @@ import type {
   HoverGeometry,
   GraphAnnotation,
 } from '../src';
+import { SEED_ANNOTATIONS } from './sampleData';
 
 const ANNOTATIONS_STORAGE_PREFIX = 'translator-graph-view:annotations:';
 const SHOW_MINIMAP_STORAGE_KEY = 'translator-graph-view:showMiniMap';
@@ -72,10 +73,11 @@ export function usePersistedDisplaySettings(): {
   return { showMiniMap, setShowMiniMap, colorMode, setColorMode };
 }
 
-function readAnnotations(key: string): GraphAnnotation[] {
+function readAnnotations(key: string, seed: GraphAnnotation[]): GraphAnnotation[] {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
+    // Nothing stored yet means a first visit, so hand back the dataset's seed.
+    if (raw === null) return seed;
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
@@ -104,8 +106,12 @@ export function usePersistedAnnotations(dataset: string): {
   addAnnotation: () => void;
 } {
   const storageKey = `${ANNOTATIONS_STORAGE_PREFIX}${dataset}`;
+  const read = useCallback(
+    (key: string) => readAnnotations(key, SEED_ANNOTATIONS[dataset] ?? []),
+    [dataset],
+  );
   const [annotations, setAnnotations] = useLocalStorage(storageKey, {
-    read: readAnnotations,
+    read,
     write: writeAnnotations,
   });
 

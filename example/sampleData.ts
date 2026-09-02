@@ -1,4 +1,4 @@
-import type { GraphData } from '../src';
+import type { GraphAnnotation, GraphData } from '../src';
 
 export const smallGraph: GraphData = {
   nodes: {
@@ -192,3 +192,23 @@ function buildHugeGraph(nodeCount: number, edgeCount: number, seed = 42): GraphD
 }
 
 export const hugeGraph: GraphData = buildHugeGraph(HUGE_NODE_COUNT, HUGE_EDGE_COUNT);
+
+/**
+ * Annotations the example starts with, keyed by dataset. The small graph carries
+ * one note exercising every link form the annotation display view renders: a
+ * bare URL with parens, a markdown link, and an email address.
+ */
+export const SEED_ANNOTATIONS: Record<string, GraphAnnotation[]> = {
+  small: [
+    {
+      id: 'seed-metformin-refs',
+      text: [
+        'Metformin \u2192 AMPK is the anchor edge here.',
+        'Background: https://en.wikipedia.org/wiki/Metformin_(drug)',
+        'Mechanism: [Rena et al. 2017](https://doi.org/10.1007/s00125-017-4342-z)',
+        'Questions: curator@example.org',
+      ].join('\n'),
+      position: { x: -300, y: 40 },
+    },
+  ],
+};

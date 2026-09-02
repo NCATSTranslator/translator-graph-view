@@ -112,7 +112,7 @@ describe('GraphView', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('Important note')).toBeInTheDocument();
+      expect(screen.getByText('Important note')).toBeInTheDocument();
     });
   });
 
@@ -320,7 +320,7 @@ describe('GraphView', () => {
         onSelectionDelete={onSelectionDelete}
       />,
     );
-    await screen.findByDisplayValue('Important note');
+    fireEvent.click(await screen.findByText('Important note'));
     fireEvent.click(screen.getByText('Aspirin'));
     const textarea = screen.getByDisplayValue('Important note');
 

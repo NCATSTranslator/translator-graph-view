@@ -28,5 +28,8 @@ export {
   isAnnotationNode,
 } from './annotationTransform';
 
+export { parseAnnotationText, toSafeHref } from './annotationText';
+export type { AnnotationTextToken } from './annotationText';
+
 export { computeHoverFocus } from './hoverFocus';
 export type { HoverFocusIds, HoverFocusSets, HoverFocusEdge } from './hoverFocus';

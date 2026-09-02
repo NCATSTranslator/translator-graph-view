@@ -6,7 +6,9 @@ function annotationStylesEqual(a: GraphAnnotationStyles, b: GraphAnnotationStyle
     && a.className === b.className
     && a.deleteButton?.backgroundColor === b.deleteButton?.backgroundColor
     && a.deleteButton?.className === b.deleteButton?.className
-    && a.deleteButton?.icon === b.deleteButton?.icon;
+    && a.deleteButton?.icon === b.deleteButton?.icon
+    && a.linkify === b.linkify
+    && a.linkClassName === b.linkClassName;
 }
 
 /** Keep a referentially stable annotationStyles object when values are unchanged. */
