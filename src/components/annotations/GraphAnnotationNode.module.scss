@@ -24,6 +24,7 @@
 }
 
 .sizer,
+.display,
 .textarea {
   grid-area: 1 / 1;
   margin: 0;
@@ -39,6 +40,35 @@
   min-height: 48px;
   padding: 0;
   pointer-events: none;
+}
+
+.display {
+  min-height: 48px;
+  padding: 0;
+  color: #333;
+  cursor: text;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid #4285f4;
+    outline-offset: 2px;
+  }
+}
+
+.placeholder {
+  color: #999;
+}
+
+.link {
+  color: #1a56c4;
+  text-decoration: underline;
+  cursor: pointer;
+  pointer-events: auto;
+
+  &:hover,
+  &:focus-visible {
+    color: #0b3d96;
+  }
 }
 
 .textarea {
