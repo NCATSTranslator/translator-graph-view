@@ -88,6 +88,12 @@ export interface Selection {
   edges: GraphEdge[];
 }
 
+/** Ids of the elements a delete gesture asked to remove, split by kind. */
+export interface DeleteSelection {
+  nodes: string[];
+  edges: string[];
+}
+
 // ReactFlow node/edge data types
 export interface GraphNodeData extends Record<string, unknown> {
   label: string;
@@ -256,6 +262,16 @@ export interface GraphViewProps {
   /** Fires after layout positions are applied: ELK layouts when computation finishes, custom layout when `nodePositions` sync. */
   onLayoutComplete?: (positions: NodePositionMap) => void;
   onSelectionChange?: (selection: Selection) => void;
+  /**
+   * Fires when Delete or Backspace is pressed with elements selected. The view
+   * never removes them itself, so the client stays the single source of truth:
+   * drop them from `data` to make the deletion stick.
+   *
+   * `edges` includes every edge incident to a deleted node, not only the edges
+   * the user selected. Unlike `onNodeRemove` (chrome, single node id only), this
+   * reports the full multi-selection plus those incident edges.
+   */
+  onSelectionDelete?: (selection: DeleteSelection) => void;
   onNodeClick?: (node: GraphNode) => void;
   onEdgeClick?: (edge: GraphEdge) => void;
   onNodeHover?: (node: GraphNode | null, geometry: HoverGeometry | null) => void;

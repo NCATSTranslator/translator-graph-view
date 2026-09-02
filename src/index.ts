@@ -42,6 +42,7 @@ export type {
   LayoutType,
   EdgeType,
   Selection,
+  DeleteSelection,
   Result,
   Path,
   Publication,
