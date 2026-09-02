@@ -29,6 +29,7 @@ export interface GraphViewState {
   hoverHandlers: HoverGeometryHandlers;
   handleNodeClick: ReturnType<typeof useGraphViewInteraction>['handleNodeClick'];
   handleEdgeClick: ReturnType<typeof useGraphViewInteraction>['handleEdgeClick'];
+  handleBeforeDelete: ReturnType<typeof useGraphViewInteraction>['handleBeforeDelete'];
 }
 
 export function useGraphViewState(options: UseGraphViewStateOptions): GraphViewState {
