@@ -122,9 +122,13 @@ function GraphNodeComponent({ id, data, selected, isConnectable = true }: NodePr
   const { getNodeIcon, getNodeColor } = useNodeChrome();
   const nodeRef = useRef<HTMLDivElement>(null);
   const nodeColors = getNodeColor?.(nodeData.primaryType, nodeData.graphNode);
+  const background = nodeColors?.background;
+  const hoverBackground = nodeColors?.hoverBackground;
   const nodeStyle = useMemo(
-    () => nodeStyleFor(nodeColors),
-    [nodeColors?.background, nodeColors?.hoverBackground],
+    () => nodeStyleFor(
+      background === undefined ? undefined : { background, hoverBackground },
+    ),
+    [background, hoverBackground],
   );
 
   const nodeTypeIcon = getNodeIcon?.(nodeData.primaryType, nodeData.graphNode)

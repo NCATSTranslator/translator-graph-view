@@ -114,62 +114,80 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/**
- * Synthetic graph for layout/render performance testing (~400 nodes, ~1200 edges).
- * Built once at module load so dataset switches stay cheap.
- */
-function buildHugeGraph(nodeCount: number, edgeCount: number, seed = 42): GraphData {
-  const rand = mulberry32(seed);
+function buildHugeNodes(nodeCount: number): {
+  nodes: GraphData['nodes'];
+  nodeIds: string[];
+} {
   const nodes: GraphData['nodes'] = {};
-  const edges: GraphData['edges'] = {};
   const nodeIds: string[] = [];
-
   for (let i = 0; i < nodeCount; i++) {
     const id = `huge-n${i}`;
     const type = HUGE_NODE_TYPES[i % HUGE_NODE_TYPES.length];
     const label = type.replace('biolink:', '');
-    nodes[id] = {
-      id,
-      names: [`${label} ${i}`],
-      types: [type],
-    };
+    nodes[id] = { id, names: [`${label} ${i}`], types: [type] };
     nodeIds.push(id);
   }
+  return { nodes, nodeIds };
+}
 
+function addHugeEdge(
+  edges: GraphData['edges'],
+  seen: Set<string>,
+  edgeIndex: number,
+  subject: string,
+  object: string,
+): number {
+  const key = `${subject}->${object}`;
+  if (seen.has(key)) return edgeIndex;
+  seen.add(key);
+  const id = `huge-e${edgeIndex}`;
+  edges[id] = {
+    id,
+    subject,
+    object,
+    predicate: HUGE_PREDICATES[(edgeIndex + 1) % HUGE_PREDICATES.length],
+  };
+  return edgeIndex + 1;
+}
+
+function buildHugeEdges(
+  nodeIds: string[],
+  edgeCount: number,
+  rand: () => number,
+): GraphData['edges'] {
+  const edges: GraphData['edges'] = {};
   const seen = new Set<string>();
   let edgeIndex = 0;
+  const nodeCount = nodeIds.length;
 
   // Keep the graph connected with a spanning tree first.
   for (let i = 1; i < nodeCount; i++) {
-    const subject = nodeIds[Math.floor(rand() * i)];
-    const object = nodeIds[i];
-    const key = `${subject}->${object}`;
-    seen.add(key);
-    const id = `huge-e${edgeIndex++}`;
-    edges[id] = {
-      id,
-      subject,
-      object,
-      predicate: HUGE_PREDICATES[edgeIndex % HUGE_PREDICATES.length],
-    };
+    edgeIndex = addHugeEdge(
+      edges,
+      seen,
+      edgeIndex,
+      nodeIds[Math.floor(rand() * i)],
+      nodeIds[i],
+    );
   }
 
   while (edgeIndex < edgeCount) {
     const subject = nodeIds[Math.floor(rand() * nodeCount)];
     const object = nodeIds[Math.floor(rand() * nodeCount)];
     if (subject === object) continue;
-    const key = `${subject}->${object}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const id = `huge-e${edgeIndex++}`;
-    edges[id] = {
-      id,
-      subject,
-      object,
-      predicate: HUGE_PREDICATES[edgeIndex % HUGE_PREDICATES.length],
-    };
+    edgeIndex = addHugeEdge(edges, seen, edgeIndex, subject, object);
   }
 
+  return edges;
+}
+
+/**
+ * Synthetic graph for layout/render performance testing (~400 nodes, ~1200 edges).
+ * Built once at module load so dataset switches stay cheap.
+ */
+function buildHugeGraph(nodeCount: number, edgeCount: number, seed = 42): GraphData {
+  const { nodes, nodeIds } = buildHugeNodes(nodeCount);
+  const edges = buildHugeEdges(nodeIds, edgeCount, mulberry32(seed));
   return { nodes, edges };
 }
 
