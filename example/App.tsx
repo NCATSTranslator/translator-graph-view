@@ -7,7 +7,8 @@ import {
   type Selection,
 } from '../src';
 import { smallGraph, mediumGraph, hugeGraph } from './sampleData';
-import { useTooltipDelay, useExampleData, useGraphHoverState, usePersistedAnnotations, usePersistedShowMiniMap } from './hooks';
+import { useTooltipDelay, useExampleData, useGraphHoverState, usePersistedAnnotations, usePersistedDisplaySettings } from './hooks';
+import { getExampleNodeColor } from './nodeColors';
 import {
   ToggleList,
   SelectionList,
@@ -70,7 +71,7 @@ function App() {
   const [selection, setSelection] = useState<Selection>({ nodes: [], edges: [] });
   const [sidebarHoveredNodeId, setSidebarHoveredNodeId] = useState<string | null>(null);
   const [sidebarHoveredEdgeId, setSidebarHoveredEdgeId] = useState<string | null>(null);
-  const { showMiniMap, setShowMiniMap } = usePersistedShowMiniMap();
+  const { showMiniMap, setShowMiniMap, colorMode, setColorMode } = usePersistedDisplaySettings();
   const [showHandles, setShowHandles] = useState(true);
   const { annotations, setAnnotations, addAnnotation } = usePersistedAnnotations(dataset);
 
@@ -125,6 +126,14 @@ function App() {
             ]}
             active={showHandles ? 'on' : 'off'}
             onChange={(value) => setShowHandles(value === 'on')}
+          />
+          <ToggleList
+            items={[
+              { label: 'Color on', value: 'on' },
+              { label: 'Color off', value: 'off' },
+            ]}
+            active={colorMode ? 'on' : 'off'}
+            onChange={(value) => setColorMode(value === 'on')}
           />
         </SidebarSection>
 
@@ -197,6 +206,7 @@ function App() {
           showEdgeLabels={false}
           showMiniMap={showMiniMap}
           showHandles={showHandles}
+          getNodeColor={colorMode ? getExampleNodeColor : undefined}
           nodeChrome={NODE_CHROME}
           onNodeRemove={(nodeId) => console.log('Remove node:', nodeId)}
           onNodeMenu={(nodeId, position) => console.log('Node menu:', nodeId, position)}
